@@ -164,7 +164,7 @@ int main(int argc, char* argv[]){
     myInfo.vicino1=-1;
     myInfo.vicino2=-1;
 
-    //Registrato verra' posto a uno se il comando start andra' a buon fine scrivo un commento
+    //Registrato verra' posto a uno se il comando start andra' a buon fine 
     registrato=0;
     interfacciaPeerStart();
     //Gestisco variabili per la select
