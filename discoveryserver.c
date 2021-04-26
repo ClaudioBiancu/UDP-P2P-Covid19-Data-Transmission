@@ -1,21 +1,15 @@
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/file.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <time.h>
+#include "./utility/utility_ds.c"
 
-
-#define BUFLEN 1024
-
+/********************************VARIABILI*********************************/
 int sd, len, attivo;
 int num_peers=0;
 char buffer[BUFLEN];
 struct sockaddr_in my_addr, cl_addr;
+
+//Variabili per gestire input da socket oppure da stdin
+fd_set readset; //set di descrittori pronti
+fd_set master; // set di descrittori da monitorare
+int fdmax; //Descrittore max
 
 struct peerReg{
     struct sockaddr_in peer_addr;
@@ -23,37 +17,12 @@ struct peerReg{
     struct sockaddr_in nextPeer;
 } *registroPeers;
 
+/*****************************FINE VARIABILI*********************************/
 
-void creaSocketAscolto(int porta) {
-  int ret;
-  int addrlen = sizeof(cl_addr);
-  /* Creazione socket UDP */
-  sd = socket(AF_INET, SOCK_DGRAM|SOCK_NONBLOCK, 0);
-  /* Creazione indirizzo */
-  memset(&my_addr, 0, sizeof(my_addr)); // Per convenzione
-  my_addr.sin_family = AF_INET ;
-  my_addr.sin_port = htons(porta);
-  my_addr.sin_addr.s_addr = INADDR_ANY;
+/********************************SEZIONE OPERATIVA DISCOVERY SERVER****************************/
 
-  /*Aggancio*/
-  ret = bind(sd, (struct sockaddr*)&my_addr, sizeof(my_addr));
-  if( ret < 0 ){
-      perror("Bind non riuscita\n");
-      exit(0);
-  }
-  printf("Discovery Server in ascolto sulla porta:%d\n", porta);
- /* while(1){
-      do{
-        ret = recvfrom(sd, buffer, BUFLEN, 0,(struct sockaddr*)&cl_addr, &addrlen);
-        buffer[BUFLEN]='\0';
-        printf("%s\n", buffer);
-        if(ret<0){
 
-        }
-}*/
-
-}
-
+/******************************** FINE SEZIONE OPERATIVA PEER*********************************/
 
 
 
@@ -128,19 +97,44 @@ void leggiComando() {
 /************************************** SEZIONE MAIN*********************************/
 
 int main(int argc, char* argv[]){
+  int porta;
   if(argc != 2) {
       fprintf(stderr, "Istruzione di avvio non riconosciuta, dovresti usare: ./discoveryserver <porta>\n");
       exit(1);
   }
+
+  porta=atoi(argv[1]);
+  if(porta<0 || porta>65535){//controllo che la porta inserita sia valida
+      fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere tra 0 e 65535\n");
+      exit(1);
+  }
+  creaSocketAscolto(atoi(argv[1]));
   interfacciaServerStart();
 
-  creaSocketAscolto(atoi(argv[1]));
+  //Gestisco variabili per la select
+  FD_ZERO(&master);
+  FD_ZERO(&readset);
 
-  attivo=1;
-  //Dopo aver stampato la lista dei comandi attende l'immissione di uno di essi
-  while(attivo!=0){
-      leggiComando();
-      printf("\n");
+  FD_SET(sd, &master);
+  FD_SET(0, &master);
+  fdmax = sd;
+
+  //ciclo infinito che gestisce il funzionameto del discoveryserver
+  while(1){
+      readset = master;
+      //select(fdmax+1, &readset, NULL, NULL, NULL);
+      printf("> ");
+
+      if(FD_ISSET(0, &readset)){
+          leggiComando();
+
+          FD_CLR(0, &readset);
+     }
+
+      if(FD_ISSET(sd, &readset)){
+
+        FD_CLR(sd, &readset);
+      }
   }
   return 0;
 }
