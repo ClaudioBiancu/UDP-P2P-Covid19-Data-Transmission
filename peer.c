@@ -166,6 +166,7 @@ int main(int argc, char* argv[]){
     //Registrato verra' posto a uno se il comando start andra' a buon fine
     registrato=0;
     interfacciaPeerStart();
+    printf("> ");
     //Gestisco variabili per la select
     FD_ZERO(&master);
     FD_ZERO(&readset);
@@ -176,8 +177,9 @@ int main(int argc, char* argv[]){
     //ciclo infinito che gestisce il funzionameto del peer
     while(1){
         readset = master;
-        //select(fdmax+1, &readset, NULL, NULL, NULL);
         printf("> ");
+        select(fdmax+1, &readset, NULL, NULL, NULL);
+
 
         if(FD_ISSET(0, &readset)){
             leggiComando();

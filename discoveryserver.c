@@ -34,7 +34,7 @@ if(comando==NULL){
       printf(" 1) !help               \t Mostra i dettagli dei comandi\n");
       printf(" 2) !showpeers          \t Mostra un elenco dei peer connessi\n");
       printf(" 3) !showneighbor <peer>\t Mostra i neighbor di un peer\n");
-      printf(" 4) !esc                \t Chiude il DSDettaglio comandi\n");
+      printf(" 4) !esc                \t Chiude il DSDettaglio comandi\n\n");
   }
 }
 
@@ -65,8 +65,6 @@ void esc(){
 void leggiComando() {
     char* parola;
 
-    printf("> ");
-
     //Attendo input da tastiera
     fgets(buffer, BUFLEN, stdin);
 
@@ -86,7 +84,7 @@ void leggiComando() {
         esc(parola);
     }
     else {
-        printf("Comando non valido.\n\n ");
+        printf("\n Comando non valido.\n\n ");
         guidaServer(NULL);
     }
 }
@@ -99,17 +97,18 @@ void leggiComando() {
 int main(int argc, char* argv[]){
   int porta;
   if(argc != 2) {
-      fprintf(stderr, "Istruzione di avvio non riconosciuta, dovresti usare: ./discoveryserver <porta>\n");
+      fprintf(stderr, " Istruzione di avvio non riconosciuta, dovresti usare: ./discoveryserver <porta>\n");
       exit(1);
   }
 
   porta=atoi(argv[1]);
   if(porta<0 || porta>65535){//controllo che la porta inserita sia valida
-      fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere tra 0 e 65535\n");
+      fprintf(stderr, " Il numero di porta inserita non e' utilizzabile, dovrebbe essere tra 0 e 65535\n");
       exit(1);
   }
-  creaSocketAscolto(atoi(argv[1]));
   interfacciaServerStart();
+  sd=creaSocketAscolto(&my_addr, porta);
+
 
   //Gestisco variabili per la select
   FD_ZERO(&master);
@@ -118,12 +117,13 @@ int main(int argc, char* argv[]){
   FD_SET(sd, &master);
   FD_SET(0, &master);
   fdmax = sd;
-
   //ciclo infinito che gestisce il funzionameto del discoveryserver
   while(1){
       readset = master;
-      //select(fdmax+1, &readset, NULL, NULL, NULL);
-      printf("> ");
+      printf(">");
+      fflush(stdout);
+      select(fdmax+1, &readset, NULL, NULL, NULL);
+
 
       if(FD_ISSET(0, &readset)){
           leggiComando();

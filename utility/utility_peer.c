@@ -35,9 +35,9 @@ int creaSocketAscolto(struct sockaddr_in* socket_ascolto, int porta) {
     // Creazione socket
     sd = socket(AF_INET, SOCK_DGRAM, 0);
     memset(socket_ascolto, 0, sizeof(*socket_ascolto)); // Pulizia
-	socket_ascolto->sin_family = AF_INET;
-	socket_ascolto->sin_port = htons(porta);
-	inet_pton(AF_INET, LOCALHOST, &socket_ascolto->sin_addr);
+    socket_ascolto->sin_family = AF_INET;
+    socket_ascolto->sin_port = htons(porta);
+	   inet_pton(AF_INET, LOCALHOST, &socket_ascolto->sin_addr);
 
     ret = bind(sd, (struct sockaddr*)socket_ascolto, sizeof(*socket_ascolto));
     if(ret<0){

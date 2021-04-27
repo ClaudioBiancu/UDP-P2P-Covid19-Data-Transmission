@@ -19,28 +19,29 @@
 
 /***************** FINE COSTANTI********************/
 /*****************HEADER**************************/
-int creaSocketAscolto(int porta);
+int creaSocketAscolto(struct sockaddr_in* my_addr, int porta);
 /***************** FINE HEADER********************/
 
 
-void creaSocketAscolto(int porta) {
+int creaSocketAscolto(struct sockaddr_in* my_addr,int porta) {
+  int sd;
   int ret;
-  int addrlen = sizeof(cl_addr);
   /* Creazione socket UDP */
-  sd = socket(AF_INET, SOCK_DGRAM|SOCK_NONBLOCK, 0);
+  sd = socket(AF_INET, SOCK_DGRAM, 0);
   /* Creazione indirizzo */
-  memset(&my_addr, 0, sizeof(my_addr)); // Per convenzione
-  my_addr.sin_family = AF_INET ;
-  my_addr.sin_port = htons(porta);
-  my_addr.sin_addr.s_addr = INADDR_ANY;
+  memset(my_addr, 0, sizeof(*my_addr)); // Per convenzione
+  my_addr->sin_family = AF_INET ;
+  my_addr->sin_port = htons(porta);
+  //my_addr.sin_addr.s_addr = INADDR_ANY;
+  inet_pton(AF_INET, LOCALHOST, &my_addr->sin_addr);
 
   /*Aggancio*/
-  ret = bind(sd, (struct sockaddr*)&my_addr, sizeof(my_addr));
+  ret = bind(sd, (struct sockaddr*)my_addr, sizeof(*my_addr));
   if( ret < 0 ){
       perror("Bind non riuscita\n");
       exit(0);
   }
-  printf("Discovery Server in ascolto sulla porta:%d\n", porta);
+  printf("Discovery Server in ascolto sulla porta:%d\n\n", porta);
  /* while(1){
       do{
         ret = recvfrom(sd, buffer, BUFLEN, 0,(struct sockaddr*)&cl_addr, &addrlen);
@@ -50,5 +51,7 @@ void creaSocketAscolto(int porta) {
 
         }
 }*/
+
+return sd;
 
 }
