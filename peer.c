@@ -166,7 +166,6 @@ int main(int argc, char* argv[]){
     //Registrato verra' posto a uno se il comando start andra' a buon fine
     registrato=0;
     interfacciaPeerStart();
-    printf("> ");
     //Gestisco variabili per la select
     FD_ZERO(&master);
     FD_ZERO(&readset);
@@ -178,6 +177,7 @@ int main(int argc, char* argv[]){
     while(1){
         readset = master;
         printf("> ");
+        fflush(stdout);
         select(fdmax+1, &readset, NULL, NULL, NULL);
 
 

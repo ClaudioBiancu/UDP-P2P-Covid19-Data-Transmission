@@ -1,9 +1,11 @@
 #include "./utility/utility_ds.c"
 
 /********************************VARIABILI*********************************/
-int sd, len, attivo;
+int sd;
 int num_peers=0;
-char buffer[BUFLEN];
+char buffer[BUFLEN];//buffer gestione socket
+char buffer_stdin[BUFLEN]; //Buffer comandi da standard input
+char recv_buffer[MAX_TIPO+1]; //Messaggio di richiesta connessione
 struct sockaddr_in my_addr, cl_addr;
 
 //Variabili per gestire input da socket oppure da stdin
@@ -63,25 +65,25 @@ void esc(){
 }
 
 void leggiComando() {
-    char* parola;
+    char* comando;
 
     //Attendo input da tastiera
-    fgets(buffer, BUFLEN, stdin);
+    fgets(buffer_stdin, BUFLEN, stdin);
 
     //Estraggo la prima parola digitata cosi' da poter discriminare i vari comandi
-    parola = strtok(buffer, " \n");
+    parola = strtok(buffer_stdin, " \n");
     //Controllo che la parola digitata sia uguale a uno dei comandi disponibili e in caso chiamo la funzione associata
-    if(strcmp(parola, "!help") == 0) {
-        help(parola);
+    if(strcmp(comando, "!help") == 0) {
+        help(comando);
     }
-    else if(strcmp(parola, "!showpeers") == 0) {
-        showpeers(parola);
+    else if(strcmp(comando, "!showpeers") == 0) {
+        showpeers(comando);
     }
-    else if(strcmp(parola, "!showneighbor") == 0) {
-        showneighbor(parola);
+    else if(strcmp(comando, "!showneighbor") == 0) {
+        showneighbor(comando);
     }
-    else if(strcmp(parola, "!esc") == 0) {
-        esc(parola);
+    else if(strcmp(comando, "!esc") == 0) {
+        esc(comando);
     }
     else {
         printf("\n Comando non valido.\n\n ");
@@ -132,6 +134,12 @@ int main(int argc, char* argv[]){
      }
 
       if(FD_ISSET(sd, &readset)){
+        riceviUDP(sd, buffer, MAX_SOCKET_RECV);
+        sscanf(buffer, "%s", recv_buffer);
+        recv_buffer[MAX_TIPO] = '\0';
+
+        printf("Arrivato messaggio %s da %d sul socket\n", sd, peer_port);
+
 
         FD_CLR(sd, &readset);
       }

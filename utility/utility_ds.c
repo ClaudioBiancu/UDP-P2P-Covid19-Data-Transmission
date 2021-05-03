@@ -17,9 +17,13 @@
 
 #define LOCALHOST "127.0.0.1"
 
+#define MAX_SOCKET_RECV 630
+#define MAX_TIPO 8
+
 /***************** FINE COSTANTI********************/
 /*****************HEADER**************************/
 int creaSocketAscolto(struct sockaddr_in* my_addr, int porta);
+int riceviUDP();
 /***************** FINE HEADER********************/
 
 
@@ -53,5 +57,17 @@ int creaSocketAscolto(struct sockaddr_in* my_addr,int porta) {
 }*/
 
 return sd;
+
+}
+
+int riceviUDP(int socket, char* buffer, int buff_l){
+  struct sockaddr_in send_addr;
+    socklen_t send_addr_len;
+
+    send_addr_len = sizeof(send_addr);
+
+    recvfrom(socket, buffer, buff_l, 0, (struct sockaddr*)&send_addr, &send_addr_len);
+
+    return ntohs(send_addr.sin_port);
 
 }
