@@ -30,19 +30,19 @@ int creaSocketAscolto(struct sockaddr_in* socket_ascolto, int porta);
 //Crea il socket UDP collegandosi al server con indirizzo passato come primo parametro
 //e alla porta passata come secondo parametro, restituisce un descrittore di socket
 int creaSocketAscolto(struct sockaddr_in* socket_ascolto, int porta) {
-    int ret;
-    int sd;
-    // Creazione socket
-    sd = socket(AF_INET, SOCK_DGRAM, 0);
-    memset(socket_ascolto, 0, sizeof(*socket_ascolto)); // Pulizia
-    socket_ascolto->sin_family = AF_INET;
-    socket_ascolto->sin_port = htons(porta);
-	   inet_pton(AF_INET, LOCALHOST, &socket_ascolto->sin_addr);
+        int ret;
+        int sd;
+        // Creazione socket
+        sd = socket(AF_INET, SOCK_DGRAM, 0);
+        memset(socket_ascolto, 0, sizeof(*socket_ascolto)); // Pulizia
+        socket_ascolto->sin_family = AF_INET;
+        socket_ascolto->sin_port = htons(porta);
+        inet_pton(AF_INET, LOCALHOST, &socket_ascolto->sin_addr);
 
-    ret = bind(sd, (struct sockaddr*)socket_ascolto, sizeof(*socket_ascolto));
-    if(ret<0){
-        perror("Errore in fase di binding");
-        exit(0);
-    }
-    return sd;
+        ret = bind(sd, (struct sockaddr*)socket_ascolto, sizeof(*socket_ascolto));
+        if(ret<0){
+                perror("Errore in fase di binding");
+                exit(0);
+        }
+        return sd;
 }
