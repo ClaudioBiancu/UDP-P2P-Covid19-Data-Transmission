@@ -3,24 +3,26 @@
 /********************************VARIABILI*********************************/
 //socket di ascolto del peer
 int sd;//socket di ascolto del peer
-int len; //variabile di servizio
+int ret; //variabile di servizio
 char buffer[BUFLEN]; //buffer utilizzato dal socket
 char buffer_stdin[BUFLEN]; //buffer utilizzato per i comandi da standard-input
 struct sockaddr_in socketAscolto_addr; // Struttura per gestire il socket di ascolto del peer
-struct sockaddr_in sv_addr; // Struttura per il server
+int portaServer;
 int registrato; //se a 1 il ds ha risposto alla richiesta di boot
 
 //struttura che descrive il mio peer
-struct peer{
-        int porta;
-        int vicino1;
-        int vicino2;
-} myInfo;
+
 
 //Variabili per gestire input da socket oppure da stdin
 fd_set readset; //set di descrittori pronti
 fd_set master; // set di descrittori da monitorare
 int fdmax; //Descrittore max
+
+struct Peer{
+        int porta;
+        int vicino1;
+        int vicino2;
+} myInfo;
 
 /*****************************FINE VARIABILI*********************************/
 
@@ -36,6 +38,9 @@ int fdmax; //Descrittore max
 */
 void start(char*parola){
         int porta;
+        char recv_buffer[MAX_LISTA];
+        char temp_buffer[MAX_TIPO];
+        int temp_n[2];
         if(registrato==1){ // Il comando start e' gia' andato a buon fine precedentemente, quindi la variabile registrato e' stata settata.
                 printf(" Attenzione il peer è già stato avviato correttamente\n\n");
                 return;
@@ -52,7 +57,7 @@ void start(char*parola){
         if(parola!=NULL){
                 porta= atoi(parola); //La seconda parola dopo il comando rappresenta la porta di ascolto del DS
                 if(porta>0 || porta<65535)//controllo che la porta inserita sia valida
-                        myInfo.porta=porta;
+                        portaServer=porta;
                 else{
                         printf("numero porta %d:", porta);
                         fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere compresa tra 0 e 65535\n");
@@ -63,9 +68,29 @@ void start(char*parola){
                 fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere compresa tra 0 e 65535\n");
                 return;
         }
-        printf(" Qui registro al ds\n\n");
+        inviaUDP(sd, "BOOT_RIC", MAX_SOCKET_RECV, portaServer, "CONN_ACK");
 
-        //registrazione():// chiedo il boot al DS
+        riceviUDP(sd, recv_buffer, MAX_LISTA, portaServer, "VICINI_L");
+        registrato=1;
+        ret = sscanf(recv_buffer, "%s %d %d", temp_buffer, &temp_n[0], &temp_n[1]);
+
+        switch(ret){
+                    case 1:
+                        printf("Lista vuota, nessun vicino\n");
+                        break;
+                    case 2:
+                        printf("Un vicino con porta %d\n", temp_n[0]);
+                        myInfo.vicino1 = temp_n[0];
+                        break;
+                    case 3:
+                        printf("Due vicini con porta %d e %d\n", temp_n[0], temp_n[1]);
+                        myInfo.vicino1 = temp_n[0];
+                        myInfo.vicino2 = temp_n[1];
+                        break;
+                    default:
+                        printf("Problema nella trasmissione della lista\n");
+                }
+
 }
 
 void add(){
@@ -155,6 +180,7 @@ int main(int argc, char* argv[]){
         myInfo.vicino2=-1;
 
         //Registrato verra' posto a uno se il comando start andra' a buon fine
+        portaServer = -1;
         registrato=0;
         interfacciaPeerStart();
 
@@ -164,22 +190,21 @@ int main(int argc, char* argv[]){
         FD_SET(sd, &master);
         FD_SET(0, &master);
         fdmax = sd;
-
+        printf("> ");
         //ciclo infinito che gestisce il funzionameto del peer
         while(1){
                 readset = master;
-                printf("> ");
+                //printf("> ");
                 fflush(stdout);
                 select(fdmax+1, &readset, NULL, NULL, NULL);
 
-
                 if(FD_ISSET(0, &readset)){//Gestione comando da terminale
                         leggiComando();
+                        printf("> ");
                         FD_CLR(0, &readset);
                 }
 
                 if(FD_ISSET(sd, &readset)){//Gestione messaggi su socket
-
 
                   FD_CLR(sd, &readset);
                 }
