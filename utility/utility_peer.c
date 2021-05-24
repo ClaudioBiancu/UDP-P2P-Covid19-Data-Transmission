@@ -1,4 +1,4 @@
-//File contenente costanti e funzioni di utilita' per i peer
+dataOra//File contenente costanti e funzioni di utilita' per i peer
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -17,6 +17,12 @@
 #define MAX_SOCKET_RECV 630 //Dimentsione massima messaggio ricevuto
 #define MAX_TIPO 8 //Dimensione massima tipo richiesta al ds
 #define MAX_LISTA 21 //Dimensione massima lista vicini
+#define TIPO_ENTRY 10
+#define MAX_DATA 10
+#define TMAX_TEMPO 8
+
+char dataOra[MAX_DATA+1];
+char tempoOra[MAX_TEMPO+1];
 
 /***************** FINE COSTANTI********************/
 
@@ -65,19 +71,64 @@ void riceviUDP(int socket, char* buff, int lunghezza_buffer, int send_port, char
         }
 }
 
-void inviaUDP(int socket, char* buff, int buff_l, int recv_port, char* acked){
-        int ret;
+void inviaUDP(int socket, char* buff, int buff_l, int recv_port){
+        int ret=-1;
         struct sockaddr_in recv_addr;
         socklen_t recv_addr_len;
-
         pulisciIndirizzi(&recv_addr, recv_port);
         recv_addr_len=sizeof(recv_addr);
-        ret = 0;
                 //Invio lista
-                do {
+                while(ret<0){
                         ret = sendto(socket, buff, buff_l+1, 0, (struct sockaddr*)&recv_addr, recv_addr_len);
-                } while(ret<0);
+                        if(ret<0){
+                                sleep(5);
+                                printf("Attendo risposta");
+                        }
+                }
 
 
         printf("Messaggio %s inviato correttamente al destinatario %d\n", buff, recv_port);
 }
+
+
+/***************** GESTORE FILE********************/
+
+
+
+//Recupera la data e l'ora correnti e le inserisce nelle variabili globali lato client
+void trovaTempo(){
+    time_t tempoOraTemp;
+    struct tm* tmOraTemp;
+
+    tempoOraTemp = time(NULL);
+    tmOraTemp = gmtime(&tempoOraTemp);
+
+    if(tmOraTemp->tm_hour < 18)
+        sprintf(dataOra, "%04d:%02d:%02d", tmOraTemp->tm_year+1900, tmOraTemp->tm_mon+1, tmOraTemp->tm_mday);
+    else {
+        tmOraTemp->tm_mday += 1;
+        tempoOraTemp = mktime(tmOraTemp);
+        tmOraTemp = gmtime(&tempoOraTemp);
+        sprintf(dataOra, "%04d:%02d:%02d", tmOraTemp->tm_year+1900, tmOraTemp->tm_mon+1, tmOraTemp->tm_mday);
+    }
+    dataOra[MAX_DATA] = '\0';
+    sprintf(tempoOra, "%02d:%02d:%02d", tmOraTemp->tm_hour, tmOraTemp->tm_min, tmOraTemp->tm_sec);
+    tempoOra[MAX_TEMPO] = '\0';
+}
+void inserisciEntry(char tipo, int quanto, int miaPorta){
+    FILE *fd;
+    char filename[MAX_FILENAME_LEN];
+
+    trovaTempo();
+
+    sprintf(filename, "%s%s_%d.txt", "./", dataOra, miaPorta);
+
+    printf("Filename: %s\n", filename);
+
+    fd = fopen(filename, "a");
+    fprintf(fd, "%s %c %d %d;\n", tempoOra, type, quanto, miaPorta);//******************************************************************************
+    fclose(fd);
+
+    printf("Entry inserita!\n");
+}
+/***************** FINE GESTORE FILE********************/

@@ -93,8 +93,42 @@ void start(char*parola){
 
 }
 
-void add(){
-        printf("\nADD AVVIATO\n\n");
+void add(char*parola){
+        char tipo;
+        int quanto;
+        char nuovaEntry[TIPO_ENTRY+1];
+
+        if(portaServer == -1|| registrato == 0){//Se peer non connesso non faccio nulla
+                printf("Peer non connesso\n");
+                return;
+        }
+
+        parola = strtok(NULL, SPAZIO);
+        if(parola==NULL || strlen(parola) > 45){// Controllo che numero di caratteri sia 45 di un indirizzo ipv6
+                fprintf(stderr, "L'indirizzo ip non e' valido. Un indirizzo ipv4 puo' avere fino a 15 caratteri, un indirizzo ipv6 fino a 45\n");
+                return;             // Comunque in caso di errore, questo  verra' segnalato nel momento di tentativo di connessione al server
+        }
+        if((strcmp(parola, "N") != 0) && (strcmp(parola, "T") != 0)){
+		printf("Formato invalido, digitare: !add <type> <quantity> \n");
+                return;
+        }
+        tipo=parola;
+        parola = strtok(NULL, SPAZIO);
+        ret = sscanf(buffer_stdin, "%s %c %d", command, &tipo, &quanto);
+
+        quanto= atoi(parola);
+        if(quanto < 1){
+                printf("Formato invalido, inserisci una quantità positiva\n");
+                return;
+        }
+
+
+        ret = sprintf(nuovaEntry, "%s %c", "NEW_ENTR", tipo);
+        nuovaEntry[ret] = '\0';
+
+        inviaUDP(sd, nuovaEntry, ret, portaServer);
+        inserisciEntry(tipo, quanto, myInfo.porta);
+
 }
 
 void get(){
