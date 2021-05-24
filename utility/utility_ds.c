@@ -333,6 +333,6 @@ void inserisciEntry(char t){
         rename("./txtDS/temp_entries.txt", filename);
     }
 
-    printf("Aggiunta entry di tipo %c\n\n>", t);
+    
 }
 /***************** FINE GESTORE FILE********************/
