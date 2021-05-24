@@ -68,7 +68,7 @@ void start(char*parola){
                 fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere compresa tra 0 e 65535\n");
                 return;
         }
-        inviaUDP(sd, "BOOT_RIC", MAX_SOCKET_RECV, portaServer, "CONN_ACK");
+        inviaUDP(sd, "BOOT_RIC", MAX_SOCKET_RECV, portaServer);
 
         riceviUDP(sd, recv_buffer, MAX_LISTA, portaServer, "VICINI_L");
         registrato=1;
@@ -112,9 +112,11 @@ void add(char*parola){
 		printf("Formato invalido, digitare: !add <type> <quantity> \n");
                 return;
         }
-        tipo=parola;
+        if(strcmp(parola, "N") == 0)
+                tipo='N';
+        else
+                tipo='T';
         parola = strtok(NULL, SPAZIO);
-        ret = sscanf(buffer_stdin, "%s %c %d", command, &tipo, &quanto);
 
         quanto= atoi(parola);
         if(quanto < 1){

@@ -16,7 +16,6 @@
 #define MAX_SOCKET_RECV 630 //Dimentsione massima messaggio ricevuto
 #define MAX_TIPO 8 //Dimensione massima tipo richiesta al ds
 #define MAX_LISTA 21 //Dimensione massima lista vicini
-#define ACKWAIT 15000//Attesa dell'ack
 /****************FINE COSTANTI********************/
 
 

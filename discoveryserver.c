@@ -152,41 +152,42 @@ int main(int argc, char* argv[]){
                                                 FD_CLR(sd, &readset);
                                                 continue;
                                         }
+
+                                        trovaVicini(portaPeer, peersConnessi+1, &temp_port[0], &temp_port[1]);
+                                        printf("Vicini di %d: %d e %d\n", portaPeer, temp_port[0], temp_port[1]);
+
+                                        if(temp_port[0] == -1 && temp_port[1] == -1)
+                                                n = sprintf(lista_buffer, "%s", "VICINI_L");
+                                        else if(temp_port[1] == -1)
+                                                n = sprintf(lista_buffer, "%s %d", "VICINI_L", temp_port[0]);
+                                        else
+                                                n = sprintf(lista_buffer, "%s %d %d", "VICINI_L", temp_port[0], temp_port[1]);
+
+                                        printf("Lista da inviare a %d: %s (lunga %d byte)\n", portaPeer, lista_buffer, n);
+
+                                        inviaUDP(sd, lista_buffer, n, portaPeer);
+
+                                        //Invio eventuale lista aggiornata al primo peer
+                                        if(temp_port[0] != -1){
+                                            //Preparo la struttura che devo tirare su
+                                            trovaLista(temp_port[0], peersConnessi+1, "VIC_UPDT", list_update_buffer, &n);
+                                            printf("Invio lista di update %s a %d\n", list_update_buffer, temp_port[0]);
+                                            inviaUDP(sd, list_update_buffer, n, temp_port[0]);
+                                        }
+
+                                        if(temp_port[1] != -1){
+                                            trovaLista(temp_port[1], peersConnessi+1, "VIC_UPDT", list_update_buffer, &n);
+                                            printf("Invio lista di update %s a %d\n", list_update_buffer, temp_port[1]);
+                                            inviaUDP(sd, list_update_buffer, n, temp_port[1]);
+                                        }
+
+                                        //Incremento il numero di peer
+                                        peersConnessi++;
+                                        printf("Peer connessi: %d\n\n>", peersConnessi);
                                 }
-                                trovaVicini(portaPeer, peersConnessi+1, &temp_port[0], &temp_port[1]);
-                                printf("Vicini di %d: %d e %d\n", portaPeer, temp_port[0], temp_port[1]);
-
-                                if(temp_port[0] == -1 && temp_port[1] == -1)
-                                        n = sprintf(lista_buffer, "%s", "VICINI_L");
-                                else if(temp_port[1] == -1)
-                                        n = sprintf(lista_buffer, "%s %d", "VICINI_L", temp_port[0]);
-                                else
-                                        n = sprintf(lista_buffer, "%s %d %d", "VICINI_L", temp_port[0], temp_port[1]);
-
-                                printf("Lista da inviare a %d: %s (lunga %d byte)\n", portaPeer, lista_buffer, n);
-
-                                inviaUDP(sd, lista_buffer, n, portaPeer);
-
-                                //Invio eventuale lista aggiornata al primo peer
-                                if(temp_port[0] != -1){
-                                    //Preparo la struttura che devo tirare su
-                                    trovaLista(temp_port[0], peersConnessi+1, "VIC_UPDT", list_update_buffer, &n);
-                                    printf("Invio lista di update %s a %d\n", list_update_buffer, temp_port[0]);
-                                    inviaUDP(sd, list_update_buffer, n, temp_port[0]);
-                                }
-
-                                if(temp_port[1] != -1){
-                                    trovaLista(temp_port[1], peersConnessi+1, "VIC_UPDT", list_update_buffer, &n);
-                                    printf("Invio lista di update %s a %d\n", list_update_buffer, temp_port[1]);
-                                    inviaUDP(sd, list_update_buffer, n, temp_port[1]);
-                                }
-
-                                //Incremento il numero di peer
-                                peersConnessi++;
-                                printf("Peer connessi: %d\n\n>", peersConnessi);
                         }
-                        FD_CLR(sd, &readset);
                 }
+                FD_CLR(sd, &readset);
         }
         return 0;
 }

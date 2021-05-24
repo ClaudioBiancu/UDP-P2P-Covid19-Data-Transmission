@@ -1,4 +1,4 @@
-dataOra//File contenente costanti e funzioni di utilita' per i peer
+//File contenente costanti e funzioni di utilita' per i peer
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -8,6 +8,7 @@ dataOra//File contenente costanti e funzioni di utilita' per i peer
 #include <stdlib.h>
 #include <unistd.h>
 #include <math.h>
+#include <time.h>
 /*****************COSTANTI**************************/
 //Torna utile quando devo scorrere una stringa e mi serve un delimitatore
 #define SPAZIO " \n"
@@ -19,7 +20,8 @@ dataOra//File contenente costanti e funzioni di utilita' per i peer
 #define MAX_LISTA 21 //Dimensione massima lista vicini
 #define TIPO_ENTRY 10
 #define MAX_DATA 10
-#define TMAX_TEMPO 8
+#define MAX_TEMPO 8
+#define MAX_FILE 31
 
 char dataOra[MAX_DATA+1];
 char tempoOra[MAX_TEMPO+1];
@@ -117,7 +119,7 @@ void trovaTempo(){
 }
 void inserisciEntry(char tipo, int quanto, int miaPorta){
     FILE *fd;
-    char filename[MAX_FILENAME_LEN];
+    char filename[MAX_FILE];
 
     trovaTempo();
 
@@ -126,7 +128,7 @@ void inserisciEntry(char tipo, int quanto, int miaPorta){
     printf("Filename: %s\n", filename);
 
     fd = fopen(filename, "a");
-    fprintf(fd, "%s %c %d %d;\n", tempoOra, type, quanto, miaPorta);//******************************************************************************
+    fprintf(fd, "%s %c %d %d;\n", tempoOra, tipo, quanto, miaPorta);//******************************************************************************
     fclose(fd);
 
     printf("Entry inserita!\n");
