@@ -16,7 +16,15 @@
 #define MAX_SOCKET_RECV 630 //Dimentsione massima messaggio ricevuto
 #define MAX_TIPO 8 //Dimensione massima tipo richiesta al ds
 #define MAX_LISTA 21 //Dimensione massima lista vicini
+#define MAX_DATA 10
+#define MAX_TEMPO 8
+#define MAX_FILE 31
+
+
+char dataOra[MAX_DATA+1];
+char tempoOra[MAX_TEMPO+1];
 /****************FINE COSTANTI********************/
+
 
 
 
@@ -82,7 +90,7 @@ int alreadyBooted(int porta){
     char temp_buffer[INET_ADDRSTRLEN];
     int temp;
 
-    fd = fopen("./bootedPeers.txt", "r");
+    fd = fopen("./txtDS/bootedPeers.txt", "r");
 
     if(fd){
         while(fscanf(fd, "%s %d", temp_buffer, &temp)==2){
@@ -102,7 +110,7 @@ int inserisci_peer(char* addr, int port, int peersConnessi){
 
         //Se primo peer a connettersi
         if(peersConnessi == 0){
-                fp = fopen("./bootedPeers.txt", "w");
+                fp = fopen("./txtDS/bootedPeers.txt", "w");
                 fprintf(fp, "%s %d\n", addr, port);
                 fclose(fp);
                 return 1;
@@ -112,7 +120,7 @@ int inserisci_peer(char* addr, int port, int peersConnessi){
         if(peersConnessi == 1){
 
                 temp_port[1] = -1;//non utilizzo la porta 1
-                fp = fopen("./bootedPeers.txt", "r");
+                fp = fopen("./txtDS/bootedPeers.txt", "r");
                 temp = fopen("temp.txt", "w");
 
                 fscanf(fp, "%s %d", temp_buff, &temp_port[0]);
@@ -126,15 +134,15 @@ int inserisci_peer(char* addr, int port, int peersConnessi){
                 }
                 fclose(temp);
                 fclose(fp);
-                remove("./bootedPeers.txt");
-                rename("temp.txt", "./bootedPeers.txt");
+                remove("./txtDS/bootedPeers.txt");
+                rename("temp.txt", "./txtDS/bootedPeers.txt");
 
                 return 1;
         }
 
         //Inserisco ordinatamente nel caso di due o piu' peer gia' presenti
         else {
-                fp = fopen("./bootedPeers.txt", "r");
+                fp = fopen("./txtDS/bootedPeers.txt", "r");
                 temp = fopen("temp.txt", "w");
 
                 temp_port[0] = -1;
@@ -180,8 +188,8 @@ int inserisci_peer(char* addr, int port, int peersConnessi){
                 //Fine
                 fclose(temp);
                 fclose(fp);
-                remove("./bootedPeers.txt");
-                rename("temp.txt", "./bootedPeers.txt");
+                remove("./txtDS/bootedPeers.txt");
+                rename("temp.txt", "./txtDS/bootedPeers.txt");
 
                 return 1;
         }
@@ -196,7 +204,7 @@ int trovaPorta(int posizione){ //Restituisce data la posizione il numero della p
     char temp[INET_ADDRSTRLEN];
     int ret;
 
-    fp = fopen("./bootedPeers.txt", "r");
+    fp = fopen("./txtDS/bootedPeers.txt", "r");
     if(fp == NULL)
         return -1;
 
@@ -216,7 +224,7 @@ void trovaVicini(int peer, int peersConnessi, int *vicino1, int *vicino2){ //Tro
         int m,first,temp;
         char temp_buff[INET_ADDRSTRLEN];
 
-        fd = fopen("./bootedPeers.txt", "r");
+        fd = fopen("./txtDS/bootedPeers.txt", "r");
         //Algoritmo simile a quello di inserimento
 
         (*vicino1) = -1;
@@ -272,5 +280,59 @@ void trovaLista(int peer, int peersConnessi, char* mess_type, char* list_buffer,
 
         list_buffer[(*list_length)] = '\0';
         printf("Lista preparata: %s\n", list_buffer);
+}
+
+void trovaTempo(){
+    time_t tempoOraTemp;
+    struct tm* tmOraTemp;
+
+    tempoOraTemp = time(NULL);
+    tmOraTemp = gmtime(&tempoOraTemp);
+
+    if(tmOraTemp->tm_hour < 18)
+        sprintf(dataOra, "%04d:%02d:%02d", tmOraTemp->tm_year+1900, tmOraTemp->tm_mon+1, tmOraTemp->tm_mday);
+    else {
+        tmOraTemp->tm_mday += 1;
+        tempoOraTemp = mktime(tmOraTemp);
+        tmOraTemp = gmtime(&tempoOraTemp);
+        sprintf(dataOra, "%04d:%02d:%02d", tmOraTemp->tm_year+1900, tmOraTemp->tm_mon+1, tmOraTemp->tm_mday);
+    }
+    dataOra[MAX_DATA] = '\0';
+    sprintf(tempoOra, "%02d:%02d:%02d", tmOraTemp->tm_hour, tmOraTemp->tm_min, tmOraTemp->tm_sec);
+    tempoOra[MAX_TEMPO] = '\0';
+}
+
+void inserisciEntry(char t){
+    FILE *fd1, *fd2;
+    int entries[2];
+    char filename[MAX_FILE];
+    int type;
+
+    trovaTempo();
+    sprintf(filename, "%s%s_%s", "./txtDS/", dataOra, "entries.txt");
+
+    type = (t == 'T') ? 0 : 1;
+
+    fd1 = fopen(filename, "r");
+    if(fd1 == NULL){
+        fd2 = fopen(filename, "w");
+        entries[type] = 1;
+        entries[(type+1)%2] = 0;
+        fprintf(fd2, "%d %d", entries[0], entries[1]);
+        fclose(fd2);
+        return;
+    }
+    else {
+        fd2 = fopen("./txtDS/temp_entries.txt", "w");
+        fscanf(fd1, "%d %d", &entries[0], &entries[1]);
+        entries[type]++;
+        fprintf(fd2, "%d %d", entries[0], entries[1]);
+        fclose(fd1);
+        fclose(fd2);
+        remove(filename);
+        rename("./txtDS/temp_entries.txt", filename);
+    }
+
+    printf("Aggiunta entry di tipo %c\n\n>", t);
 }
 /***************** FINE GESTORE FILE********************/

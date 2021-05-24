@@ -185,6 +185,17 @@ int main(int argc, char* argv[]){
                                         peersConnessi++;
                                         printf("Peer connessi: %d\n\n>", peersConnessi);
                                 }
+                                else{
+                                        printf("Peer gia' inserito: %d\n\n>");
+                                }
+                        }
+                        if(strcmp(recv_buffer, "NEW_ENTR") == 0){
+                                char tipo;
+
+                                sscanf(buffer, "%s %c", recv_buffer, &tipo);
+
+                                inserisciEntry(tipo);
+                                printf("Aggiunta entry di tipo %c\n\n>", tipo);
                         }
                 }
                 FD_CLR(sd, &readset);

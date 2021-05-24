@@ -60,35 +60,35 @@ void start(char*parola){
                         portaServer=porta;
                 else{
                         printf("numero porta %d:", porta);
-                        fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere compresa tra 0 e 65535\n");
+                        fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere compresa tra 0 e 65535\n\n");
                         return;
                 }
         }
         else{
-                fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere compresa tra 0 e 65535\n");
+                fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere compresa tra 0 e 65535\n\n");
                 return;
         }
         inviaUDP(sd, "BOOT_RIC", MAX_SOCKET_RECV, portaServer);
 
-        riceviUDP(sd, recv_buffer, MAX_LISTA, portaServer, "VICINI_L");
+        riceviUDP(sd, recv_buffer, MAX_LISTA);
         registrato=1;
         ret = sscanf(recv_buffer, "%s %d %d", temp_buffer, &temp_n[0], &temp_n[1]);
 
         switch(ret){
                     case 1:
-                        printf("Lista vuota, nessun vicino\n");
+                        printf("Lista vuota, nessun vicino\n\n");
                         break;
                     case 2:
-                        printf("Un vicino con porta %d\n", temp_n[0]);
+                        printf("Un vicino con porta %d\n\n", temp_n[0]);
                         myInfo.vicino1 = temp_n[0];
                         break;
                     case 3:
-                        printf("Due vicini con porta %d e %d\n", temp_n[0], temp_n[1]);
+                        printf("Due vicini con porta %d e %d\n\n", temp_n[0], temp_n[1]);
                         myInfo.vicino1 = temp_n[0];
                         myInfo.vicino2 = temp_n[1];
                         break;
                     default:
-                        printf("Problema nella trasmissione della lista\n");
+                        printf("Problema nella trasmissione della lista\n\n");
                 }
 
 }
@@ -241,8 +241,59 @@ int main(int argc, char* argv[]){
                 }
 
                 if(FD_ISSET(sd, &readset)){//Gestione messaggi su socket
+                        int util_port;
+                        char temp_buffer[MAX_TIPO+1];
 
-                  FD_CLR(sd, &readset);
+                        util_port = riceviUDP(sd, buffer, MAX_SOCKET_RECV);
+                        //Leggo il tipo del messaggio
+                        sscanf(buffer, "%s", temp_buffer);
+                        temp_buffer[MAX_TIPO] = '\0';
+
+                        if(util_port == portaServer){
+                                printf("Messaggio ricevuto dal server: %s\n", buffer);
+
+                                //Arrivo nuova lista
+                                if(strcmp(temp_buffer, "VIC_UPDT")==0){
+                                        //Numero di nuovi neighbor
+                                        int count;
+                                        int temp_n[2];
+
+
+
+                                        temp_n[0] = -1;
+                                        temp_n[1] = -1;
+
+                                        printf("Parametri prima di sscanf: %d e %d\n", temp_n[0], temp_n[1]);
+
+                                        count = sscanf(buffer, "%s %d %d", temp_buffer, &temp_n[0], &temp_n[1]);
+
+                                        printf("Parametri dopo sscanf: %d e %d\n", temp_n[0], temp_n[1]);
+
+                                        //Modifica ai vicini
+                                        switch(count){
+                                                case 1:
+                                                    //DEBUG
+                                                    printf("Sono rimasto l'unico peer\n\n>");
+                                                    myInfo.vicino1 = -1;
+                                                    myInfo.vicino2 = -1;
+                                                    break;
+                                                case 2:
+                                                    printf("Un vicino con porta %d\n\n>", temp_n[0]);
+                                                    myInfo.vicino1  = temp_n[0];
+                                                    myInfo.vicino2 = -1;
+                                                    break;
+                                                case 3:
+                                                    printf("Due vicini con porta %d e %d\n\n>", temp_n[0], temp_n[1]);
+                                                    myInfo.vicino1  = temp_n[0];
+                                                    myInfo.vicino2 = temp_n[1];
+                                                    break;
+                                                default:
+                                                    printf("Questa riga di codice non dovrebbe mai andare in esecuzione\n\n>");
+                                                    break;
+                                        }
+                                }
+                        }
+                        FD_CLR(sd, &readset);
                 }
         }
         return 0;

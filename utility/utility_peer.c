@@ -23,6 +23,7 @@
 #define MAX_TEMPO 8
 #define MAX_FILE 31
 
+
 char dataOra[MAX_DATA+1];
 char tempoOra[MAX_TEMPO+1];
 
@@ -52,7 +53,7 @@ int creaSocketAscolto(struct sockaddr_in* socket_ascolto, int porta) {
 }
 
 
-void riceviUDP(int socket, char* buff, int lunghezza_buffer, int send_port, char* correct_header){
+/*void riceviUDP(int socket, char* buff, int lunghezza_buffer, int send_port, char* correct_header){
         int ret;
         struct sockaddr_in send_addr;
         socklen_t send_addr_len;
@@ -71,6 +72,18 @@ void riceviUDP(int socket, char* buff, int lunghezza_buffer, int send_port, char
         else {
                 printf("[R] Arrivato un messaggio %s inatteso da %d mentre attendevo %s da ", temp_buffer, ntohs(send_addr.sin_port), correct_header);//Stampo il messaggio di errore giusto
         }
+}*/
+
+int riceviUDP(int socket, char* buffer, int buff_l){
+        int ret;
+        struct sockaddr_in send_addr;
+        socklen_t send_addr_len;
+        send_addr_len = sizeof(send_addr);
+        do {
+		ret = recvfrom(socket, buffer, buff_l, 0, (struct sockaddr*)&send_addr, &send_addr_len);
+	} while (ret < 0);
+        printf("Messaggio ricevuto: %s\n", buffer);
+        return ntohs(send_addr.sin_port);
 }
 
 void inviaUDP(int socket, char* buff, int buff_l, int recv_port){
@@ -123,7 +136,7 @@ void inserisciEntry(char tipo, int quanto, int miaPorta){
 
     trovaTempo();
 
-    sprintf(filename, "%s%s_%d.txt", "./", dataOra, miaPorta);
+    sprintf(filename, "%s%s_%d.txt", "./txtPeer/", dataOra, miaPorta);
 
     printf("Filename: %s\n", filename);
 
@@ -131,6 +144,6 @@ void inserisciEntry(char tipo, int quanto, int miaPorta){
     fprintf(fd, "%s %c %d %d;\n", tempoOra, tipo, quanto, miaPorta);//******************************************************************************
     fclose(fd);
 
-    printf("Entry inserita!\n");
+    printf("Entry inserita!\n\n");
 }
 /***************** FINE GESTORE FILE********************/
