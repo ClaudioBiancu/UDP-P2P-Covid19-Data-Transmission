@@ -189,6 +189,46 @@ int main(int argc, char* argv[]){
                                         printf("Peer gia' inserito: %d\n\n>");
                                 }
                         }
+
+                        if(strcmp(recv_buffer, "CLT_EXIT") == 0){
+                                //Variabili per salvare informazioni temporanee
+                                int temp_nbr_port[2];
+                                char list_update[MAX_LISTA];
+                                int n;
+
+                                printf("Ricevuto messaggio di richiesta di uscita da %d\n", portaPeer);
+
+                                //Se il peer per qualche motivo non e' in lista non faccio nulla
+                                if(!alreadyBooted(portaPeer)){
+                                        printf("Peer %d non presente nella lista dei peer connessi. Uscita\n", portaPeer);
+                                        FD_CLR(sd, &readset);
+                                        continue;
+                                }
+
+                                trovaVicini(portaPeer, peersConnessi, &temp_nbr_port[0], &temp_nbr_port[1]);
+
+                                printf("Elimino il peer dalla rete. Aggiorno la lista di vicini di %d e %d\n", temp_nbr_port[0], temp_nbr_port[1]);
+
+                                rimuoviPeer(portaPeer);
+
+                                if(temp_nbr_port[0] == -1){
+                                        printf("Eliminato l'ultimo peer connesso\n\n>");
+                                }
+                                else {
+                                        trovaLista(temp_nbr_port[0], peersConnessi-1, "VIC_UPDT", list_update, &n);
+                                        printf("Lista che sta per essere inviata a %d: %s\n\n>", temp_nbr_port[0], list_update);
+                                        inviaUDP(sd, list_update, n, temp_nbr_port[0]);
+
+                                        if(temp_nbr_port[1] != -1){
+                                                trovaLista(temp_nbr_port[1], peersConnessi-1, "VIC_UDPT", list_update, &n);
+                                                printf("Lista che sta per essere inviata a %d: %s\n\n>", temp_nbr_port[1], list_update);
+                                                inviaUDP(sd, list_update, n, temp_nbr_port[1]);
+                                        }
+
+                                }
+                        peersConnessi--;
+                        }
+
                         if(strcmp(recv_buffer, "NEW_ENTR") == 0){
                                 char tipo;
 
@@ -196,6 +236,21 @@ int main(int argc, char* argv[]){
 
                                 inserisciEntry(tipo);
                                 printf("Aggiunta entry di tipo %c\n\n>", tipo);
+                        }
+
+                        if(strcmp(recv_buffer, "ENTR_REQ") == 0){
+                                char tipo;
+                                char entr_repl[MAX_ENTRY];
+                                int ret;
+
+
+                                sscanf(buffer, "%s %c", recv_buffer, &tipo);
+
+                                ret = sprintf(entr_repl, "%s %d", "ENTR_REP", leggiEntries(tipo));
+                                entr_repl[ret] = '\0';
+
+                                inviaUDP(sd, entr_repl, ret, portaPeer);
+                                printf("\n\n>");
                         }
                 }
                 FD_CLR(sd, &readset);

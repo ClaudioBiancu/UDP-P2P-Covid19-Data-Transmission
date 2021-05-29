@@ -8,7 +8,6 @@ char buffer[BUFLEN]; //buffer utilizzato dal socket
 char buffer_stdin[BUFLEN]; //buffer utilizzato per i comandi da standard-input
 struct sockaddr_in socketAscolto_addr; // Struttura per gestire il socket di ascolto del peer
 int portaServer;
-int registrato; //se a 1 il ds ha risposto alla richiesta di boot
 
 //struttura che descrive il mio peer
 
@@ -38,10 +37,11 @@ struct Peer{
 */
 void start(char*parola){
         int porta;
+        int util_porta;
         char recv_buffer[MAX_LISTA];
         char temp_buffer[MAX_TIPO];
         int temp_n[2];
-        if(registrato==1){ // Il comando start e' gia' andato a buon fine precedentemente, quindi la variabile registrato e' stata settata.
+        if(portaServer!=-1){ // Il comando start e' gia' andato a buon fine precedentemente
                 printf(" Attenzione il peer è già stato avviato correttamente\n\n");
                 return;
         }
@@ -69,9 +69,13 @@ void start(char*parola){
                 return;
         }
         inviaUDP(sd, "BOOT_RIC", MAX_SOCKET_RECV, portaServer);
-
-        riceviUDP(sd, recv_buffer, MAX_LISTA);
-        registrato=1;
+        util_porta=riceviUDP(sd, recv_buffer, MAX_LISTA);
+        while(util_porta!=portaServer){
+                inviaUDP(sd, "BOOT_RIC", MAX_SOCKET_RECV, portaServer);
+                printf("Attendo Risposta dal Discovery Server\n\n");
+                sleep(ATTESA_BOOT);
+                util_porta=riceviUDP(sd, recv_buffer, MAX_LISTA);
+        }
         ret = sscanf(recv_buffer, "%s %d %d", temp_buffer, &temp_n[0], &temp_n[1]);
 
         switch(ret){
@@ -98,18 +102,18 @@ void add(char*parola){
         int quanto;
         char nuovaEntry[TIPO_ENTRY+1];
 
-        if(portaServer == -1|| registrato == 0){//Se peer non connesso non faccio nulla
+        if(portaServer == -1){//Se peer non connesso non faccio nulla
                 printf("Peer non connesso\n");
                 return;
         }
 
         parola = strtok(NULL, SPAZIO);
-        if(parola==NULL || strlen(parola) > 45){// Controllo che numero di caratteri sia 45 di un indirizzo ipv6
-                fprintf(stderr, "L'indirizzo ip non e' valido. Un indirizzo ipv4 puo' avere fino a 15 caratteri, un indirizzo ipv6 fino a 45\n");
-                return;             // Comunque in caso di errore, questo  verra' segnalato nel momento di tentativo di connessione al server
+        if(parola==NULL){
+                printf("Formato del comando non valido \n\n>");
+                return;
         }
         if((strcmp(parola, "N") != 0) && (strcmp(parola, "T") != 0)){
-		printf("Formato invalido, digitare: !add <type> <quantity> \n");
+		printf("Formato invalido, il tipo puo' essere solamente \"N\" o \"T\" \n");
                 return;
         }
         if(strcmp(parola, "N") == 0)
@@ -117,6 +121,10 @@ void add(char*parola){
         else
                 tipo='T';
         parola = strtok(NULL, SPAZIO);
+        if(parola==NULL){
+                printf("Formato del comando non valido \n\n>");
+                return;
+        }
 
         quanto= atoi(parola);
         if(quanto < 1){
@@ -133,12 +141,198 @@ void add(char*parola){
 
 }
 
-void get(){
-        printf("\nGET AVVIATO\n\n");
+void get(char*parola){
+        char aggr;
+        char tipo;
+        char bound[2][MAX_DATA+1];
+        int ret=3; //Inizialmente lo uso per gestire il numero dei parametri, che minimo sono 3
+        int tot_entr;
+        int peer_entr;
+        int sum_entr;
+        int temp_buffer[6];
+        char get_buffer[MAX_SOMMA]; //Ricevere il messaggio
+        char util_buffer[MAX_TEMPO];
+        char altro_buffer[MAX_SOMMA];
+        char r_type;
+        int r_quantity;
+        char entry_ins_buffer[MAX_PEERS*6];
+        char control_buffer[7];
+        char* isIn;
+
+        //Se peer non connesso non faccio nulla
+        if(portaServer == -1){
+                printf("Peer non connesso\n");
+                return;
+        }
+        parola = strtok(NULL, SPAZIO);
+        if(parola==NULL){
+                printf("Formato del comando non valido \n\n");
+                return;
+        }
+        if((strcmp(parola, "t") != 0) && (strcmp(parola, "v") != 0)){
+		printf("Aggregato  invalido, puo' essere solamente totale \"t\" o variazione \"v\" \n");
+                return;
+        }
+        else{
+                if(strcmp(parola, "t") == 0)
+                        tipo='t';
+                else
+                        tipo='v';
+        }
+        parola = strtok(NULL, SPAZIO);
+        if(parola==NULL){
+                printf("Formato del comando non valido \n\n");
+                return;
+        }
+        if((strcmp(parola, "N") != 0) && (strcmp(parola, "T") != 0)){
+		printf("Formato invalido, il tipo puo' essere solamente \"N\" o \"T\" \n");
+                return;
+        }
+        else{
+                if(strcmp(parola, "N") == 0)
+                        tipo='N';
+                else
+                        tipo='T';
+        }
+        parola = strtok(NULL, SPAZIO);
+        if (parola!=NULL){ //L'utente ha inserito correttamente i parametri 3 e 4 relativi alle date bound
+                ret=5;// I dati sono 5
+                strcpy(bound[0], parola);
+                parola = strtok(NULL, SPAZIO);
+                if(parola==NULL){
+                        printf("Formato del comando non valido \n\n");
+                        return;
+                }
+                strcpy(bound[1], parola);
+                bound[0][MAX_DATA] = '\0';
+                bound[1][MAX_DATA] = '\0';
+                if(!controllaDate(bound[0], bound[1], aggr))
+                        return;
+                else{
+                        printf("Formato date corretto \n");
+                }
+        }
+        else{ //L'utente non ha inserito un periodo
+                strcpy(bound[0], "*");
+                strcpy(bound[1], "*");
+                if(!controllaDate(bound[0], bound[1], aggr))
+                        return;
+                else{
+                        printf("Formato date corretto \n");
+                }
+        }
+
+
+
+        sum_entr = 0;
+        //Invio richiesta al server
+        ret = sprintf(get_buffer, "%s %c", "ENTR_REQ", tipo);
+        get_buffer[ret] = '\0';
+        inviaUDP(sd, get_buffer, ret, portaServer);
+
+        //Ricevo risposta
+        riceviUDP(sd, get_buffer, MAX_ENTRY);
+        sscanf(get_buffer, "%s %d", temp_buffer, &tot_entr);
+
+        peer_entr = contaEntries(tipo, myInfo.porta);
+
+        printf("Entries nel server: %d; entries qui: %d\n", tot_entr, peer_entr);
+
+        //Se nessuna entry, inutile continuare
+        if(!tot_entr)
+                printf("Nessun dato aggregato da calcolare\n");
+
+        //Se ho tutti i dati che servono, eseguo il calcolo e lo scrivo
+        else if(tot_entr == peer_entr){
+                sum_entr = sommaEntries(tipo, myInfo.porta);
+                scriviAggr(tot_entr, sum_entr, tipo, myInfo.porta);
+        }
+
+        //Altrimenti
+        else {
+                //Se non ho vicini non posso calcolare nulla
+                if(myInfo.vicino1 == -1 && myInfo.vicino2 == -1)
+                        printf("Errore insolubile, impossibile calcolare il dato richiesto\n");
+
+                else {
+                        printf("Devo chiedere informazioni ai miei vicini\n");
+                        //Controllo se qualche peer ha il dato aggregato pronto
+
+                        //Posso riciclare il buffer get_buffer
+                        ret = sprintf(get_buffer, "%s %d %d %c", "AGGR_REQ", myInfo.porta, tot_entr, tipo);
+                        get_buffer[ret] = '\0';
+
+                        inviaUDP(sd, get_buffer, ret, myInfo.vicino1);
+
+                        //Posso sfruttare get_buffer
+                        riceviUDP(sd, get_buffer, MAX_SOMMA);
+
+                        printf("Ricevuto %s\n", get_buffer);
+
+
+                        sscanf(get_buffer, "%s %d", temp_buffer, &sum_entr);
+
+                        if(sum_entr != 0){
+                                printf("Ho ottenuto il dato che cercavo\n");
+                                scriviAggr(tot_entr, sum_entr, tipo, myInfo.porta);
+                        }
+                        else{
+                                printf("Nessuno ha gia' pronto il dato cercato\n");
+                                //Necessario inviare a tutti la richiesta di nuove entries
+                                ret = sprintf(get_buffer, "%s %d %c", "EP2P_REQ", myInfo.porta, tipo);
+                                get_buffer[ret] = '\0';
+                                printf("Faccio partire il giro di richieste di entries\n");
+                                inviaUDP(sd, get_buffer, ret, myInfo.vicino1);
+
+                                //Aspetto tutte le entries che mi mancano
+                                while(peer_entr < tot_entr){
+                                        //Nuove entries: possono arrivare da tutti
+                                        ret = (myInfo.vicino1 != -1) ? 1 : 0;
+                                        riceviUDP(sd, altro_buffer, MAX_ENTRY);
+                                        printf("Ricevuta entry %s\n", altro_buffer);
+                                        sscanf(altro_buffer, "%s %s %c %d %s", temp_buffer, util_buffer, &r_type, &r_quantity, entry_ins_buffer);
+                                        //Controlli: non dovrebbero mai fallire
+                                        ret = sprintf(control_buffer, "%d;", myInfo.porta);
+                                        control_buffer[ret] = '\0';
+                                        printf("Stringa di controllo: %s\n", control_buffer);
+                                        isIn = strstr(entry_ins_buffer, control_buffer);
+                                        if(!(r_type == tipo && isIn != NULL)){
+                                                printf("Errore insolubile nella ricezione, arrivato pacchetto corrotto\n");
+                                                continue;
+                                        }
+                                        ret = sprintf(altro_buffer, "%s %c %d %s", util_buffer, r_type, r_quantity, entry_ins_buffer);
+                                        altro_buffer[ret] = 0;
+                                        if(!entryPresente(altro_buffer, myInfo.porta)){
+                                            inserisciEntryStringa(altro_buffer, myInfo.porta);
+                                            peer_entr++;
+                                        }
+                                }
+
+
+                                printf("Tutte le entries necessarie sono arrivate a destinazione\n");
+                                //Eseguo il calcolo
+                                sum_entr = sommaEntries(tipo, myInfo.porta);
+                                //Lo riporto sul file
+                                scriviAggr(tot_entr, sum_entr, tipo, myInfo.porta);
+                        }
+                }
+        }
 }
 
 void stop(){
-        printf("\nSTOP AVVIATO\n\n");
+        //Controllo che la connessione esista
+        if(portaServer== -1)
+            printf("Il peer non e' connesso al DS. Uscita\n");
+
+        else{
+            //Invio eventuali entries mancanti agli eventuali vicini
+           inviaEntriesVicini(sd, myInfo.porta, myInfo.vicino1, myInfo.vicino2);
+
+            inviaUDP(sd, "CLT_EXIT", MAX_TIPO, portaServer);
+        }
+        printf("Peer disconnesso correttamente. Uscita\n");
+        close(sd);
+        exit(0);
 }
 
 
@@ -170,6 +364,10 @@ void leggiComando() {
         char* parola;
         fgets(buffer, BUFLEN, stdin);/*Attendo input da tastiera*/
         parola = strtok(buffer, SPAZIO);/*Estraggo la prima parola digitata cosi' da poter discriminare i vari comandi*/
+        if(parola==NULL){
+                printf("Comando non valido.\n\n ");
+                guidaPeer(NULL);
+        }
         if(strcmp(parola, "!start") == 0) {
                 start(parola);
         }
@@ -217,7 +415,6 @@ int main(int argc, char* argv[]){
 
         //Registrato verra' posto a uno se il comando start andra' a buon fine
         portaServer = -1;
-        registrato=0;
         interfacciaPeerStart();
 
         //Gestisco variabili per la select
@@ -292,9 +489,99 @@ int main(int argc, char* argv[]){
                                                     break;
                                         }
                                 }
+
+                                //Arrivo chiusura Server
+                                if(strcmp(temp_buffer, "SRV_EXIT")==0){
+                                    printf("Il server sta per chiudere\n");
+
+                                    //Chiude
+                                    printf("Chiusura peer\n");
+                                    close(sd);
+                                    _exit(0);
+                                }
+                        }
+
+
+                        else if(util_port == myInfo.vicino1 || util_port == myInfo.vicino2){
+                                printf("Messaggio %s arrivato dal vicino %d\n", buffer, util_port);
+                                //Vicino chiede se esiste dato aggregato
+                                if(strcmp(temp_buffer, "AGGR_REQ") == 0){
+                                        int req_port;
+                                        int act_entries;
+                                        char tipo;
+                                        int aggr;
+                                        char answer[MAX_ENTRY];
+
+                                        //Invio ack
+
+
+                                        //Leggo il messaggio
+                                        sscanf(buffer, "%s %d %d %c", temp_buffer, &req_port, &act_entries, &tipo);
+
+                                        aggr = controllaAggr(act_entries, tipo, myInfo.porta);
+
+                                        if(aggr == 0){
+                                                printf("Non ho la risposta alla richiesta\n");
+                                                if(myInfo.vicino2 == -1){
+                                                        if(myInfo.vicino1 != req_port)
+                                                                printf("Errore insolubile, crash della rete\n");
+                                                        else {
+                                                                printf("Invio direttamente la risposta negativa a %d\n", myInfo.vicino1);
+                                                                strcpy(answer, "AGGR_REP 0");
+                                                                inviaUDP(sd, answer, strlen(answer), myInfo.vicino1);
+                                                        }
+                                                }
+                                                else {
+                                                        if(myInfo.vicino1 == req_port){
+                                                                printf("Invio risposta negativa a %d", myInfo.vicino1);
+                                                                strcpy(answer, "AGGR_REP 0");
+                                                                inviaUDP(sd, answer, strlen(answer), myInfo.vicino1);
+                                                        }
+                                                        else {
+                                                                printf("Inoltro la richiesta a %d\n", myInfo.vicino1);
+                                                                inviaUDP(sd, buffer, strlen(buffer), myInfo.vicino1);
+                                                        }
+                                                }
+                                        }
+                                        else {
+                                                printf("Ho la risposta che cerca il peer %d\n", req_port);
+                                                ret = sprintf(answer, "%s %d", "AGGR_REP", aggr);
+                                                answer[ret] = '\0';
+                                                inviaUDP(sd, answer, ret, req_port);
+                                        }
+                                }
+
+                                        //Messaggio di richiesta entries
+                                if(strcmp(temp_buffer, "EP2P_REQ") == 0){
+                                        char r_type;
+                                        //Invio ack
+
+                                        //Leggo il numero del mittente riciclando util_port
+                                        sscanf(buffer, "%s %d %c", temp_buffer, &util_port, &r_type);
+                                        //Invio tutte le entries mancanti
+                                        inviaEntriesMancanti(util_port, r_type, "EP2P_REP", myInfo.porta, sd);
+
+                                        //Inoltro richiesta o invio alt
+                                        if(myInfo.vicino1 == util_port){
+                                                printf("Invio HLT al peer %d che ha fatto partire il giro di richieste\n", myInfo.vicino1);
+                                                inviaUDP(sd, "EP2P_HLT", MAX_TIPO, myInfo.vicino1);
+                                        }
+                                        else {
+                                                printf("Inoltro la richiesta partita da %d al peer %d\n", util_port, myInfo.vicino1);
+                                                inviaUDP(sd, buffer, strlen(buffer), myInfo.vicino1);
+                                        }
+                                }
+
+                                //Nuova entry inviata al momento della chiusura
+                                if(strcmp(temp_buffer, "EP2P_NEW") == 0){
+
+                                        printf("Inserisco entry %s\n", buffer+9);
+                                        inserisciEntryStringa(buffer+9, myInfo.porta);
+                                }
                         }
                         FD_CLR(sd, &readset);
                 }
+
         }
         return 0;
 }

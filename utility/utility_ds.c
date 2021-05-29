@@ -19,6 +19,8 @@
 #define MAX_DATA 10
 #define MAX_TEMPO 8
 #define MAX_FILE 31
+#define MAX_SOMMA 19 //Per scelta progettuale i dati aggregati sono al massimo dell'ordine di un miliardo
+#define MAX_ENTRY 16
 
 
 char dataOra[MAX_DATA+1];
@@ -197,6 +199,37 @@ int inserisci_peer(char* addr, int port, int peersConnessi){
         return -1;
 }
 
+void rimuoviPeer(int port){
+        FILE *fd, *temp;
+        char temp_buffer[INET_ADDRSTRLEN];
+        int servo,ret;
+
+        fd = fopen("./txtDS/bootedPeers.txt", "r");
+
+        ret = fscanf(fd, "%s %d", temp_buffer, &servo);
+        if(ret < 2){
+                fclose(fd);
+                remove("./txtDS/bootedPeers.txt");
+        }
+        else {
+                temp = fopen("temp.txt", "w");
+
+        while(servo < port){
+                fprintf(temp, "%s %d\n", temp_buffer, servo);
+                fscanf(fd, "%s %d", temp_buffer, &servo);
+        }
+
+        while(fscanf(fd, "%s %d", temp_buffer, &servo)==2)
+                fprintf(temp, "%s %d\n", temp_buffer, servo);
+
+        }
+
+        fclose(fd);
+        fclose(temp);
+        remove("./txtDS/bootedPeers.txt");
+        rename("temp.txt", "./txtDS/bootedPeers.txt");
+}
+
 //Trova il numero di porta di un peer, data la sua posizione
 int trovaPorta(int posizione){ //Restituisce data la posizione il numero della porta richiesta
     FILE *fp;
@@ -333,6 +366,21 @@ void inserisciEntry(char t){
         rename("./txtDS/temp_entries.txt", filename);
     }
 
-    
+
+}
+
+int leggiEntries(char tipo){
+    FILE *fd;
+    int entries[2];
+    char filename[MAX_FILE];
+
+    trovaTempo();
+    sprintf(filename, "%s%s_%s", "./txtDS/", dataOra, "entries.txt");
+
+    fd = fopen(filename, "r");
+    if(fd == NULL)
+        return 0;
+    fscanf(fd, "%d %d", &entries[0], &entries[1]);
+    return (tipo == 'T') ? entries[0] : entries[1];
 }
 /***************** FINE GESTORE FILE********************/

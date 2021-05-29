@@ -16,4 +16,4 @@ discoveryserver: discoveryserver.o ./utility/utility_ds.o
 	gcc -Wall -c ./utility/utility_ds.c -o ./utility/utility_ds.o
 
 clean:
-	-rm *o peer discoveryserver ./utility/*.o ./txtDS/*.txt ./txtPeer/*.txt
+	-rm *o peer discoveryserver ./utility/*.o ./txtDS/bootedPeers.txt #./txtPeer/*.txt
