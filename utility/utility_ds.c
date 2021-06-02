@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/time.h>
+#include <errno.h>
 #include <time.h>
 
 /*****************COSTANTI**************************/
@@ -14,18 +16,46 @@
 #define BUFLEN 1024//Dimensione massima del buffer
 #define LOCALHOST "127.0.0.1"//Indirizzo predefinito
 #define MAX_SOCKET_RECV 630 //Dimentsione massima messaggio ricevuto
-#define MAX_TIPO 8 //Dimensione massima tipo richiesta al ds
+#define MAX_TIPO 15 //Dimensione massima tipo richiesta al ds
 #define MAX_LISTA 21 //Dimensione massima lista vicini
-#define MAX_DATA 10
+#define MAX_DATA 15
 #define MAX_TEMPO 8
 #define MAX_FILE 31
 #define MAX_SOMMA 19 //Per scelta progettuale i dati aggregati sono al massimo dell'ordine di un miliardo
 #define MAX_ENTRY 16
+#define TREMILASEICENTO 3600
+/****************FINE COSTANTI********************/
 
+/********************************VARIABILI*********************************/
+int sd;
+int peersConnessi=0;
+int EntriesGiornaliere;
+char buffer[BUFLEN];//buffer gestione socket
+char recv_buffer[BUFLEN]; //Messaggio di richiesta connessione
+struct sockaddr_in my_addr;
+//Variabili per gestire input da socket oppure da stdin
+fd_set readset; //set di descrittori pronti
+fd_set master; // set di descrittori da monitorare
+int fdmax; //Descrittore max
 
+struct Entry {
+	char date[11];
+	int num_entry_N;;
+	int num_entry_T;
+} DS_entry;
+
+struct Entry trovaEntry;
+time_t tempoOraTemp;
+struct tm* tmOraTemp;
+
+struct tm convertiData;
+time_t dataminima, datamassima, date_tmp;
+
+struct timeval *timeout;
 char dataOra[MAX_DATA+1];
 char tempoOra[MAX_TEMPO+1];
-/****************FINE COSTANTI********************/
+int debug=0;
+/*****************************FINE VARIABILI*********************************/
 
 
 
@@ -61,7 +91,6 @@ int riceviUDP(int socket, char* buffer, int buff_l){
         do {
 		ret = recvfrom(socket, buffer, buff_l, 0, (struct sockaddr*)&send_addr, &send_addr_len);
 	} while (ret < 0);
-        printf("Messaggio ricevuto: %s\n", buffer);
         return ntohs(send_addr.sin_port);
 }
 
@@ -87,7 +116,6 @@ void inviaUDP(int socket, char* buffer, int buff_l, int recv_port){
 
 /***************** GESTORE FILE********************/
 int alreadyBooted(int porta){
-        printf("Controllo che il Peer non sia gia' stato inserito\n");
     FILE *fd;
     char temp_buffer[INET_ADDRSTRLEN];
     int temp;
@@ -316,8 +344,6 @@ void trovaLista(int peer, int peersConnessi, char* mess_type, char* list_buffer,
 }
 
 void trovaTempo(){
-    time_t tempoOraTemp;
-    struct tm* tmOraTemp;
 
     tempoOraTemp = time(NULL);
     tmOraTemp = gmtime(&tempoOraTemp);
@@ -335,52 +361,172 @@ void trovaTempo(){
     tempoOra[MAX_TEMPO] = '\0';
 }
 
-void inserisciEntry(char t){
-    FILE *fd1, *fd2;
-    int entries[2];
-    char filename[MAX_FILE];
-    int type;
 
-    trovaTempo();
-    sprintf(filename, "%s%s_%s", "./txtDS/", dataOra, "entries.txt");
 
-    type = (t == 'T') ? 0 : 1;
+void inserisciEntry(){
+        FILE *fd1;
+        char filename[MAX_FILE];
+        printf("Sono dentro la Entry\n" );
+        trovaTempo();
+        sprintf(filename, "%s%s", "./txtDS/", "entries.txt");
 
-    fd1 = fopen(filename, "r");
-    if(fd1 == NULL){
-        fd2 = fopen(filename, "w");
-        entries[type] = 1;
-        entries[(type+1)%2] = 0;
-        fprintf(fd2, "%d %d", entries[0], entries[1]);
-        fclose(fd2);
-        return;
-    }
-    else {
-        fd2 = fopen("./txtDS/temp_entries.txt", "w");
-        fscanf(fd1, "%d %d", &entries[0], &entries[1]);
-        entries[type]++;
-        fprintf(fd2, "%d %d", entries[0], entries[1]);
+        fd1 = fopen(filename, "a");
+        if(fd1 == NULL){
+                printf("Errore, impossibile aprire il file entries\n\n>");
+                return;
+        }
+        else {
+                printf("Entry Inserita\n\n>" );
+                trovaTempo();
+                strftime(DS_entry.date, sizeof(DS_entry.date), "%d_%m_%Y", tmOraTemp);
+                fprintf(fd1, "%s %i %i\n", DS_entry.date, DS_entry.num_entry_N, DS_entry.num_entry_T);
+                DS_entry.num_entry_N=0;
+                DS_entry.num_entry_T=0;
+        }
         fclose(fd1);
-        fclose(fd2);
-        remove(filename);
-        rename("./txtDS/temp_entries.txt", filename);
-    }
-
-
 }
 
-int leggiEntries(char tipo){
-    FILE *fd;
-    int entries[2];
-    char filename[MAX_FILE];
 
-    trovaTempo();
-    sprintf(filename, "%s%s_%s", "./txtDS/", dataOra, "entries.txt");
+int leggiEntries(int tipo, char bound1[MAX_DATA], char bound2[MAX_DATA], int portaPeer){
+        FILE *fd;
+        char filename[MAX_FILE];
+        int totaleEntriesPeriodo=0;
+        char entr_repl[MAX_ENTRY];
+        int ret;
+        char bound1_temp[MAX_DATA];
+        char bound2_temp[MAX_DATA];
 
-    fd = fopen(filename, "r");
-    if(fd == NULL)
-        return 0;
-    fscanf(fd, "%d %d", &entries[0], &entries[1]);
-    return (tipo == 'T') ? entries[0] : entries[1];
+        convertiData.tm_hour = convertiData.tm_min = convertiData.tm_sec = 0;
+
+        int appoggioData[2][3];
+
+        if(strcmp(bound1, "*") != 0) {
+                sscanf(bound1, "%d:%d:%d", &appoggioData[0][2], &appoggioData[0][1], &appoggioData[0][0]);
+                sprintf(bound1_temp, "%i_%i_%i",appoggioData[0][2], appoggioData[0][1], appoggioData[0][0]);
+                strptime(bound1_temp, "%d_%m_%Y", &convertiData);
+                dataminima = mktime(&convertiData)+3600;
+
+
+        }
+
+        if(strcmp(bound2, "*") != 0) {
+                sscanf(bound2, "%d:%d:%d", &appoggioData[1][2], &appoggioData[1][1], &appoggioData[1][0]);
+                sprintf(bound2_temp, "%i_%i_%i", appoggioData[1][2], appoggioData[1][1], appoggioData[1][0]);
+                strptime(bound2_temp, "%d_%m_%Y", &convertiData);
+                datamassima = mktime(&convertiData)+3600;
+
+
+        }
+
+        sprintf(filename, "%s%s", "./txtDS/", "entries.txt");
+        fd = fopen(filename, "r");
+        if(fd == NULL)
+            return 0;
+        while(fscanf(fd, "%s %i %i\n", trovaEntry.date, &trovaEntry.num_entry_N, &trovaEntry.num_entry_T) != EOF) {
+        //conversione data prelevata
+
+                strptime(trovaEntry.date, "%d_%m_%Y", &convertiData);
+                date_tmp = mktime(&convertiData)+3600;
+                        if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") != 0){
+                                if((difftime(dataminima, date_tmp) <= 0) && (difftime(datamassima, date_tmp) >= 0)){
+                                        if(!tipo)
+                                                totaleEntriesPeriodo+=trovaEntry.num_entry_N;
+                                        else
+                                                totaleEntriesPeriodo+=trovaEntry.num_entry_T;
+
+                                }
+                        }
+                        if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") != 0){
+                                if(difftime(datamassima, date_tmp) >= 0){
+                                        if(!tipo)
+                                                totaleEntriesPeriodo+=trovaEntry.num_entry_N;
+                                        else
+                                                totaleEntriesPeriodo+=trovaEntry.num_entry_T;
+                                }
+                        }
+                        if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") == 0){
+                                if((difftime(dataminima, date_tmp) <= 0)){
+                                        if(!tipo)
+                                                totaleEntriesPeriodo+=trovaEntry.num_entry_N;
+                                        else
+                                                totaleEntriesPeriodo+=trovaEntry.num_entry_T;
+                                }
+                        }
+                        if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") == 0){
+                                if(!tipo)
+                                        totaleEntriesPeriodo+=trovaEntry.num_entry_N;
+                                else
+                                        totaleEntriesPeriodo+=trovaEntry.num_entry_T;
+
+                        }
+
+        }
+        ret = sprintf(entr_repl, "%s %i", "ENTR_REP", totaleEntriesPeriodo);
+        entr_repl[ret] = '\0';
+        inviaUDP(sd, entr_repl, ret, portaPeer);
+        printf("\n\n>");
+        return 1;
+}
+
+
+void stampaPeers(int peersConnessi){
+    int i;
+    printf("Peer connessi alla rete:");
+    if(!peersConnessi)
+        printf(" nessuno!");
+
+    for(i=0; i<peersConnessi; i++)
+        printf("\n%d", trovaPorta(i));
+
+    printf("\n");
+}
+
+void stampaVicino(int peersConnessi, int porta){
+    if(!alreadyBooted(porta))
+        printf("Peer %d non connesso alla rete!\n", porta);
+    else {
+        int temp_port[2];
+        trovaVicini(porta, peersConnessi, &temp_port[0], &temp_port[1]);
+        printf("Vicini del peer %d: ", porta);
+        if(temp_port[0] == -1 && temp_port[1] == -1)
+            printf("nessuno!\n");
+        else if(temp_port[1] == -1)
+            printf("soltanto %d\n", temp_port[0]);
+        else
+            printf("%d e %d\n", temp_port[0], temp_port[1]);
+    }
+}
+
+void stampaTuttiVicini(int peersConnessi){
+    int i;
+    switch(peersConnessi){
+        case 1:
+            printf("Vicini del peer %d: nessuno!\n", trovaPorta(0));
+            break;
+        case 2:
+            printf("Vicini del peer %d: soltanto %d\n", trovaPorta(0), trovaPorta(1));
+            printf("Vicini del peer %d: soltanto %d\n", trovaPorta(1), trovaPorta(0));
+            break;
+        default:
+            for(i=0; i<peersConnessi; i++)
+                printf("Vicini del peer %d: %d e %d\n", trovaPorta(i), trovaPorta((i-1+peersConnessi)%peersConnessi), trovaPorta((i+1)%peersConnessi));
+    }
 }
 /***************** FINE GESTORE FILE********************/
+
+
+//Valuta Chiusura File Odietrno
+
+void checkTime() {	//controlla se bisogna chiudere il file odierno
+        struct tm* tmOraTemp;
+        time_t tempoOraTemp;
+
+        tempoOraTemp = time(NULL);
+        tmOraTemp = gmtime(&tempoOraTemp);
+        if(((tmOraTemp->tm_hour == 18 && tmOraTemp->tm_min==1) || debug==1 ) ){ // Aspetto un minuto per ricevere tutte le Entries
+                //sleep(5);
+                inserisciEntry();
+		printf("Registro della data odierna chiuso\n");
+        }
+
+}

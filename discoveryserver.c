@@ -1,26 +1,56 @@
 #include "./utility/utility_ds.c"
 
-/********************************VARIABILI*********************************/
-int sd;
-int peersConnessi=0;
-char buffer[BUFLEN];//buffer gestione socket
-char buffer_stdin[BUFLEN]; //Buffer comandi da standard input
-char recv_buffer[MAX_TIPO+1]; //Messaggio di richiesta connessione
-struct sockaddr_in my_addr, cl_addr;
-struct timeval *timeout;
-//Variabili per gestire input da socket oppure da stdin
-fd_set readset; //set di descrittori pronti
-fd_set master; // set di descrittori da monitorare
-int fdmax; //Descrittore max
 
-
-/*****************************FINE VARIABILI*********************************/
 
 /********************************SEZIONE OPERATIVA DISCOVERY SERVER****************************/
 
 
-/******************************** FINE SEZIONE OPERATIVA PEER*********************************/
+void showpeers(){
+        stampaPeers(peersConnessi);
+}
 
+void showneighbor(char*parola){
+        int porta;
+        if(peersConnessi == 0){
+                printf("Nessun peer connesso\n");
+                return;
+        }
+        parola = strtok(NULL, SPAZIO);
+        if(parola==NULL){
+                stampaTuttiVicini(peersConnessi);
+        }
+        else{
+                porta= atoi(parola); //La seconda parola dopo il comando rappresenta la porta del peer di cui si vogliono stampare i vicini
+                if(porta>0 || porta<65535){//controllo che la porta inserita sia valida
+                        stampaVicino(peersConnessi, porta);
+                }
+                else{
+                        fprintf(stderr, "Il numero di porta inserita non e' utilizzabile, dovrebbe essere compresa tra 0 e 65535\n\n");
+                        return;
+                }
+        }
+}
+
+void esc(){
+        //Invia a tutti i peer un messaggio
+        int i;
+        printf("Invio serie di messaggi SRV_EXIT\n");
+        for(i=0; i<peersConnessi; i++){
+            //Invia al peer il messaggio di exit
+            inviaUDP(sd, "SRV_EXIT", MAX_TIPO, trovaPorta(i));
+        }
+        //Aggiorno il numero di peer connessi (dovrebbe essere 0)
+        peersConnessi = 0;
+        //Cancello il file con la lista di peer
+        remove("./txtDS/bootedPeers.txt");
+
+
+        close(sd);
+        _exit(0);
+
+}
+
+/******************************** FINE SEZIONE OPERATIVA PEER*********************************/
 
 
 /********************************SEZIONE GRAFICA TERMINALE*********************************/
@@ -35,6 +65,10 @@ if(comando==NULL){
   }
 }
 
+void help(){
+        guidaServer(NULL);
+}
+
 void interfacciaServerStart()
 {
         printf("\n********************* DISCOVERY SERVER Covid-19 ***********************\n\n");
@@ -42,42 +76,32 @@ void interfacciaServerStart()
         printf("\n**********************************************************************\n\n");
 }
 
-void help(){
-        printf("\n HELP AVVIATO\n\n");
-}
 
-void showpeers(){
-        printf("\n SHOWPEERS AVVIATO\n\n");
-}
-
-void showneighbor(){
-        printf("\nSHOWNEIGHBOR AVVIATO\n\n");
-}
-
-void esc(){
-        printf("\nESC AVVIATO\n\n");
-}
 
 void leggiComando() {
-        char* comando;
+        char* parola;
 
         //Attendo input da tastiera
-        fgets(buffer_stdin, BUFLEN, stdin);
+        fgets(buffer, BUFLEN, stdin);
 
         //Estraggo la prima parola digitata cosi' da poter discriminare i vari comandi
-        comando = strtok(buffer_stdin, " \n");
+        parola = strtok(buffer, SPAZIO);
+        if(parola==NULL){
+                printf("Comando non valido.\n\n ");
+                guidaServer(NULL);
+        }
         //Controllo che la parola digitata sia uguale a uno dei comandi disponibili e in caso chiamo la funzione associata
-        if(strcmp(comando, "!help") == 0) {
-                help(comando);
+        if(strcmp(parola, "!help") == 0) {
+                help(parola);
         }
-        else if(strcmp(comando, "!showpeers") == 0) {
-                showpeers(comando);
+        else if(strcmp(parola, "!showpeers") == 0) {
+                showpeers();
         }
-        else if(strcmp(comando, "!showneighbor") == 0) {
-                showneighbor(comando);
+        else if(strcmp(parola, "!showneighbor") == 0) {
+                showneighbor(parola);
         }
-        else if(strcmp(comando, "!esc") == 0) {
-                esc(comando);
+        else if(strcmp(parola, "!esc") == 0) {
+                esc();
         }
         else {
                 printf("\n Comando non valido.\n\n ");
@@ -86,6 +110,7 @@ void leggiComando() {
 }
 
 /********************************FINE SEZIONE GRAFICA TERMINALE*********************************/
+
 
 
 /************************************** SEZIONE MAIN*********************************/
@@ -104,7 +129,8 @@ int main(int argc, char* argv[]){
         }
         interfacciaServerStart();
         sd=creaSocketAscolto(&my_addr, porta);
-
+        peersConnessi=0;
+        EntriesGiornaliere=0;
         //Gestisco variabili per la select
         FD_ZERO(&master);
         FD_ZERO(&readset);
@@ -115,13 +141,17 @@ int main(int argc, char* argv[]){
         //ciclo infinito che gestisce il funzionameto del discoveryserver
         while(1){
 
-                timeout = malloc(sizeof(timeout));
-		timeout->tv_sec = 60;
-		timeout->tv_usec = 0;
 
                 readset = master;
                 fflush(stdout);
+
+                timeout = malloc(sizeof(timeout));
+                timeout->tv_sec = 15;
+                timeout->tv_usec = 0;
+
                 select(fdmax+1, &readset, NULL, NULL, timeout);
+
+		checkTime();
 
                 //Gestione comando da terminale
                 if(FD_ISSET(0, &readset)){
@@ -230,27 +260,26 @@ int main(int argc, char* argv[]){
                         }
 
                         if(strcmp(recv_buffer, "NEW_ENTR") == 0){
-                                char tipo;
+                                printf("Controllo NEW_ENTR");
+                                int n;
+                                int t;
+                                sscanf(buffer, "%s %i %i", recv_buffer, &n, &t);
+                                DS_entry.num_entry_N += n;
+                                DS_entry.num_entry_T += t;
+				EntriesGiornaliere ++;
 
-                                sscanf(buffer, "%s %c", recv_buffer, &tipo);
 
-                                inserisciEntry(tipo);
-                                printf("Aggiunta entry di tipo %c\n\n>", tipo);
                         }
 
                         if(strcmp(recv_buffer, "ENTR_REQ") == 0){
-                                char tipo;
-                                char entr_repl[MAX_ENTRY];
-                                int ret;
+                                int tipo;
+                                char bound1[MAX_DATA];
+                                char bound2[MAX_DATA];
 
 
-                                sscanf(buffer, "%s %c", recv_buffer, &tipo);
+                                sscanf(buffer, "%s %i %s %s", recv_buffer, &tipo, bound1, bound2);
+                                leggiEntries(tipo, bound1, bound2, portaPeer);
 
-                                ret = sprintf(entr_repl, "%s %d", "ENTR_REP", leggiEntries(tipo));
-                                entr_repl[ret] = '\0';
-
-                                inviaUDP(sd, entr_repl, ret, portaPeer);
-                                printf("\n\n>");
                         }
                 }
                 FD_CLR(sd, &readset);
