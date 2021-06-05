@@ -260,7 +260,6 @@ int main(int argc, char* argv[]){
                         }
 
                         if(strcmp(recv_buffer, "NEW_ENTR") == 0){
-                                printf("Controllo NEW_ENTR");
                                 int n;
                                 int t;
                                 sscanf(buffer, "%s %i %i", recv_buffer, &n, &t);

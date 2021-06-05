@@ -201,8 +201,11 @@ void get(char*parola){
                         return;
         }
 
+        if((strcmp(bound[0], "*")==0 || strcmp(bound[1], "*")==0 ) && aggr=='v'){
+                printf("Per calcolare un aggregato di tipo variazione inserisci un periodo limitato \n\n");
+                return;
+        }
         if(controllaAggr(bound[0], bound[1], aggr, tipo)){
-                //stampaRisultati();
                 return;
         }
 
@@ -226,7 +229,6 @@ void get(char*parola){
         //Se ho tutti i dati che servono, eseguo il calcolo e lo scrivo
         if((tot_entr == peer_entr ) && tot_entr){
                 scriviAggr(bound[0], bound[1], aggr, tipo, 0);
-                stampaRisultati();
                 return;
         }
         //Altrimenti

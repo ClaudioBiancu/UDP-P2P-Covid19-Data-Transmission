@@ -32,6 +32,7 @@
 #define MAX_ENTRY 30
 #define MAX_UPDATEENTRY 630
 #define TZ  3600
+#define MAX_ARRAY 365 //scelta progettuale variazione su massimo un anno
 
 
 
@@ -60,6 +61,14 @@ struct Entry {
 	int num_entry_T;
 } Peer_entry;
 
+struct EntrySomma{
+        char data[MAX_DATA];
+        int tipo;
+        int quanti;
+} sommaVar;
+struct EntrySomma ArraySomma[MAX_ARRAY];
+struct EntrySomma ArrayVariazione[MAX_ARRAY];
+
 struct Peer{
         int porta;
         int vicino1;
@@ -82,7 +91,7 @@ struct tm* tmOraTemp;
 int miDevoFermare=0;
 
 struct tm dateToConvert;
-time_t min_date_given, max_date_given, date_tmp;
+time_t min_date_given, max_date_given, date_tmp, ultimaData_temp;
 struct timeval *timeout;
 char dataOra[MAX_DATA+1];
 char tempoOra[MAX_TEMPO+1];
@@ -370,43 +379,39 @@ int contaEntries(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
 
 
 
-int calcolaVariazioneTIPO(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
 
-        printf("ENTRO NELLA VARIAZIONE");
+time_t trasforma(char data[MAX_DATA]){
+        strptime(data, "%d_%m_%Y", &dateToConvert);
+        return mktime(&dateToConvert)+3600;
+
+}
+int differenzaGiorni(char bound2[MAX_DATA], time_t ultima){
+        float giorni;
+        giorni=(difftime(ultima, trasforma(bound2)));
+        giorni=giorni/86400;
+        return (int)(giorni-1);
+
+}
+
+int calcolaVariazioneTIPO(char bound1[MAX_DATA], char bound2[MAX_DATA], int tipo, char aggr){
         FILE *fd;
         char filename[MAX_FILE];
-        time_t  min_date_given_temp, max_date_given_temp;
+        char directory[MAX_FILE+100];
+        int i=0;
+        int j=0;
+        int contati=0;
+        char date[MAX_DATA];
+        int tipo_temp;
+        int quanti;
         int porta;
-        int quanti=0;
-        int tipo_temp=-1;
-        char date[11];
+        char ultimaData[MAX_DATA];
         char bound1_temp[MAX_DATA];
         char bound2_temp[MAX_DATA];
-        int valori[300];
-        int i=0;
         dateToConvert.tm_hour = dateToConvert.tm_min = dateToConvert.tm_sec = 0;
+        float giorni;
+        int giorni_tmp;
         int appoggioData[2][3];
-        //Controllo sulla prima data
-
-        if(strcmp(bound1, "*") != 0) {
-                sscanf(bound1, "%d:%d:%d", &appoggioData[0][2], &appoggioData[0][1], &appoggioData[0][0]);
-                sprintf(bound1_temp, "%i_%i_%i",appoggioData[0][2], appoggioData[0][1], appoggioData[0][0]);
-                strptime(bound1_temp, "%d_%m_%Y", &dateToConvert);
-                min_date_given = mktime(&dateToConvert)+TZ;
-                min_date_given_temp=min_date_given;
-
-
-        }
-
-        if(strcmp(bound2, "*") != 0) {
-                sscanf(bound2, "%d:%d:%d", &appoggioData[1][2], &appoggioData[1][1], &appoggioData[1][0]);
-                sprintf(bound2_temp, "%i_%i_%i", appoggioData[1][2], appoggioData[1][1], appoggioData[1][0]);
-                strptime(bound2_temp, "%d_%m_%Y", &dateToConvert);
-                max_date_given = mktime(&dateToConvert)+TZ;
-                max_date_given_temp=max_date_given;
-
-        }
-
+        int misuraArray;
 
         sprintf(filename, "%s%s_%d.txt", "./txtPeer/", "entries", myInfo.porta);
         fd = fopen(filename, "r");
@@ -416,63 +421,98 @@ int calcolaVariazioneTIPO(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA
         }
 
 
-        while((difftime(min_date_given_temp, max_date_given_temp)<=0)){
-                printf("ENTRO NEL WHILE\n");
-                if(fscanf(fd, "%s %i %i %i\n", date, &tipo_temp, &quanti, &porta) != EOF){
-                        strptime(date, "%d_%m_%Y", &dateToConvert);
-                        date_tmp = mktime(&dateToConvert)+3600;
-                        if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") != 0){
-                                if((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) >= 0)){
-                                        if(tipo==tipo_temp){
-                                                if(difftime(min_date_given_temp, date_tmp) == 0){
-                                                        valori[i]=quanti;
-                                                        i++;
-                                                        min_date_given_temp+=86400;
-                                                }
-                                                else{
-                                                        valori[i]=0;
-                                                        i++;
-                                                        min_date_given_temp+=86400;
-                                                }
-                                        }
-                                }
-                        }
-                        /*if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") != 0){
-                                if(difftime(max_date_given, date_tmp) >= 0){
-                                        if(tipo==tipo_temp){
-                                                totaleEntriesPeriodo+=quanti;
-                                        }
-                                }
-                        }
-                        if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") == 0){
-                                if((difftime(min_date_given, date_tmp) <= 0)){
-                                        if(tipo==tipo_temp){
-                                                totaleEntriesPeriodo+=quanti;
-                                        }
-                                }
-                        }
-                        if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") == 0){
-                                if(tipo==tipo_temp)
-                                        totaleEntriesPeriodo+=quanti;
 
-                        }*/
+        sscanf(bound1, "%d:%d:%d", &appoggioData[0][2], &appoggioData[0][1], &appoggioData[0][0]);
+        sprintf(bound1_temp, "%i_%i_%i",appoggioData[0][2], appoggioData[0][1], appoggioData[0][0]);
+        strptime(bound1_temp, "%d_%m_%Y", &dateToConvert);
+        min_date_given = mktime(&dateToConvert)+TZ;
 
-                }
-                else{
-                        valori[i]=0;
-                        i++;
-                        min_date_given_temp+=86400;
+
+        sscanf(bound2, "%d:%d:%d", &appoggioData[1][2], &appoggioData[1][1], &appoggioData[1][0]);
+        sprintf(bound2_temp, "%i_%i_%i", appoggioData[1][2], appoggioData[1][1], appoggioData[1][0]);
+        strptime(bound2_temp, "%d_%m_%Y", &dateToConvert);
+        max_date_given = mktime(&dateToConvert)+TZ;
+
+
+        while(fscanf(fd, "%s %i %i %i\n", date, &tipo_temp, &quanti, &porta) != EOF) {
+                strptime(date, "%d_%m_%Y", &dateToConvert);
+                date_tmp = mktime(&dateToConvert)+3600;
+                if(tipo_temp==tipo && ((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) >= 0))){
+                        if(i>0){//Entries sucessive possono avere la stessa data, vado a sommare i valori
+                                if(strcmp(date,ArraySomma[i-1].data)==0 ){
+                                        ArraySomma[i-1].quanti+=quanti;
+                                }
+                                else{
+                                        strcpy(ArraySomma[i].data, date);
+                                        ArraySomma[i].tipo=tipo_temp;
+                                        ArraySomma[i].quanti=quanti;
+                                        i++;
+                                }
+                        }else{//Caso Prima Entries
+                                strcpy(ArraySomma[i].data, date);
+                                ArraySomma[i].tipo=tipo_temp;
+                                ArraySomma[i].quanti=quanti;
+                                i++;
+                        }
                 }
         }
-        valori[i]=-1;
+
+        ArraySomma[i].quanti=-1;
+        fclose(fd);
+        sprintf(filename, "%s%i%s%c_%i_%s_%s.txt", "./txtPeer/", myInfo.porta,"/aggr_",aggr, tipo, bound1, bound2);
+        fd = fopen(filename, "a");
+        if(fd == NULL){
+                sprintf(directory,"%s%i" ,"./txtPeer/",myInfo.porta);
+                mkdir(directory, 0777);
+                fd = fopen(filename, "a");
+        }
+
+        giorni=(difftime(max_date_given, min_date_given));
+        giorni=giorni/86400;
+
+        giorni_tmp=(int)(giorni+0.5-1);// numero di giorni tra una data e l'altra;
+        printf("%i\n",giorni_tmp);
+
+        contati=i;
         i=0;
-        while(valori[i]!=-1){
-                printf("%i\n", valori[i]);
+        misuraArray=giorni_tmp;
+        ArrayVariazione[misuraArray];
+        while(i<misuraArray){
+                ArrayVariazione[i].quanti=0;
+                strcpy(ArrayVariazione[i].data,"data");
                 i++;
         }
-        printf("%i\n", valori[i]);
+        i=contati-1;
+        while(i>=0){
+                ArrayVariazione[-differenzaGiorni(ArraySomma[i].data, min_date_given)-1].quanti=ArraySomma[i].quanti;
+                strcpy(ArrayVariazione[-differenzaGiorni(ArraySomma[i].data, min_date_given)-1].data, ArraySomma[i].data);
+                i--;
+        }
+        i=misuraArray-1;
+        printf("%s\n\n","AGGREGATO RICHIESTO:" );
+        while(i>=0){
+                if(strcmp(ArrayVariazione[i].data,"data")==0 && i-1>0){
+                        printf("%i) Variazione: %i\n", i, (ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti));
+                        fprintf(fd, "%i)Variazione: %i\n", i, (ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti));
+                }
+                else
+                        if((i-1)>0){
+                                printf("%i) Variazione al %s: %i\n", i, ArrayVariazione[i].data, ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti);
+                                fprintf(fd, "%i)Variazione_%s: %i\n", i, ArrayVariazione[i].data, ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti);
+                        }
+                i--;
+        }
+        i=i+1;
+        if(strcmp(ArrayVariazione[i].data,"data")==0 ){
+                printf("%i) Variazione: %i\n", i,  (ArrayVariazione[i].quanti));
+                fprintf(fd, "%i)Variazione: %i\n", i,  (ArrayVariazione[i].quanti));
+        }
+        else{
+                printf("%i) Variazione al %s: %i\n",ArrayVariazione[i].data, i,  ArrayVariazione[i].quanti);
+                fprintf(fd, "%i)Variazione_%s: %i\n",ArrayVariazione[i].data, i,  ArrayVariazione[i].quanti);
+        }
         fclose(fd);
-        return 0;
+        return 1;
 }
 
 
@@ -498,7 +538,7 @@ int calcolaTotaleTIPO(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
                 sscanf(bound1, "%d:%d:%d", &appoggioData[0][2], &appoggioData[0][1], &appoggioData[0][0]);
                 sprintf(bound1_temp, "%i_%i_%i",appoggioData[0][2], appoggioData[0][1], appoggioData[0][0]);
                 strptime(bound1_temp, "%d_%m_%Y", &dateToConvert);
-                min_date_given = mktime(&dateToConvert)+TZ;\
+                min_date_given = mktime(&dateToConvert)+TZ;
 
 
         }
@@ -564,18 +604,17 @@ void scriviAggr(char*bound1, char*bound2, char aggr, int tipo, int modalita){
         char directory[MAX_FILE+100];
         int totale;
         if(aggr=='v'){
-                printf("ENTRO NELLA AGGREGAZIONE");
-                totale= calcolaVariazioneTIPO(tipo, bound1, bound2);
+                totale= calcolaVariazioneTIPO(bound1, bound2, tipo, aggr );
         }
         else{
-                        totale= calcolaVariazioneTIPO(tipo, bound1, bound2);
+                totale= calcolaTotaleTIPO(tipo, bound1, bound2);
 
 
                 trovaTempo();
                 if(strcmp(bound2,"*")==0){
                         strftime(bound2, sizeof(Peer_entry.date), "%d:%m:%Y", tmOraTemp);
                 }
-
+                printf("%s\n\n", "AGGREGATO RICHIESTO:");
                 sprintf(filename, "%s%i%s%c_%i_%s_%s.txt", "./txtPeer/", myInfo.porta,"/aggr_",aggr, tipo, bound1, bound2);
 
                 fd = fopen(filename, "w");
@@ -583,12 +622,17 @@ void scriviAggr(char*bound1, char*bound2, char aggr, int tipo, int modalita){
                         sprintf(directory,"%s%i" ,"./txtPeer/",myInfo.porta);
                         mkdir(directory, 0777);
                         fd = fopen(filename, "w");
-                }
-                        if(modalita)
+
+                        if(modalita){
                                 fprintf(fd, "Aggregato %c %i %d", aggr, tipo, sendAggregato.totale);
-                        else
+                                printf("Aggregato %c %i %d", aggr, tipo, sendAggregato.totale);
+                        }
+                        else{
                                 fprintf(fd, "Aggregato %c %i %d", aggr, tipo, totale);
+                                printf( "Aggregato %c %i %d", aggr, tipo, totale);
+                        }
                         fclose(fd);
+                }
         }
 
 }
@@ -612,12 +656,25 @@ int controllaAggr(char*bound1, char*bound2, char aggr, int tipo){
                 return 0;
         }
         else{
+
+                printf("Possiedo l'aggregato\n\n" );
+        }
+
+        if(aggr=='v'){
+                printf("AGGREGATO RICHIESTO: \n\n" );
+                while(fscanf(fd, "%s %i\n", bound2_temp, totale) != EOF) {
+                        printf( "%s %i\n", bound2_temp, totale);
+                }
+
+        }
+        else{
+                printf("AGGREGATO RICHIESTO: \n\n" );
                 fscanf(fd, "%s %c %i %i\n", aggregato, &aggr, &tipo, &totale );
+                printf( "%s %c %i %i\n", aggregato, &aggr, &tipo, &totale );
                 sendAggregato.aggr=aggr;
-                printf("Ho l'aggregato richiesto\n" );
-                return 1;
         }
         fclose(fd);
+        return 1;
 }
 
 //Controllo che un'entry non sia gia' nel file

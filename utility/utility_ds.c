@@ -366,7 +366,6 @@ void trovaTempo(){
 void inserisciEntry(){
         FILE *fd1;
         char filename[MAX_FILE];
-        printf("Sono dentro la Entry\n" );
         trovaTempo();
         sprintf(filename, "%s%s", "./txtDS/", "entries.txt");
 
