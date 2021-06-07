@@ -447,11 +447,11 @@ int main(int argc, char* argv[]){
                                         temp_n[0] = -1;
                                         temp_n[1] = -1;
 
-                                        printf("Parametri prima di sscanf: %d e %d\n", temp_n[0], temp_n[1]);
+
 
                                         count = sscanf(buffer, "%s %d %d", temp_buffer, &temp_n[0], &temp_n[1]);
 
-                                        printf("Parametri dopo sscanf: %d e %d\n", temp_n[0], temp_n[1]);
+
 
                                         //Modifica ai vicini
                                         switch(count){
