@@ -346,7 +346,7 @@ int contaEntries(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
                 date_tmp = mktime(&dateToConvert)+TZ;
 
                         if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") != 0){
-                                if((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) >= 0)){
+                                if((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) > 0)){
                                         if(tipo==tipo_temp){
                                                 totaleEntriesPeriodo++;
                                         }
@@ -354,7 +354,7 @@ int contaEntries(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
                                 }
                         }
                         if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") != 0){
-                                if(difftime(max_date_given, date_tmp) >= 0){
+                                if(difftime(max_date_given, date_tmp) > 0){
                                         if(tipo==tipo_temp)
                                                 totaleEntriesPeriodo++;
                                 }
@@ -373,7 +373,6 @@ int contaEntries(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
 
         }
         fclose(fd);
-        printf("%i\n", totaleEntriesPeriodo);
         return totaleEntriesPeriodo;
 }
 
@@ -437,7 +436,7 @@ int calcolaVariazioneTIPO(char bound1[MAX_DATA], char bound2[MAX_DATA], int tipo
         while(fscanf(fd, "%s %i %i %i\n", date, &tipo_temp, &quanti, &porta) != EOF) {
                 strptime(date, "%d_%m_%Y", &dateToConvert);
                 date_tmp = mktime(&dateToConvert)+3600;
-                if(tipo_temp==tipo && ((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) >= 0))){
+                if(tipo_temp==tipo && ((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) > 0))){
                         if(i>0){//Entries sucessive possono avere la stessa data, vado a sommare i valori
                                 if(strcmp(date,ArraySomma[i-1].data)==0 ){
                                         ArraySomma[i-1].quanti+=quanti;
@@ -565,14 +564,14 @@ int calcolaTotaleTIPO(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
                 strptime(date, "%d_%m_%Y", &dateToConvert);
                 date_tmp = mktime(&dateToConvert)+3600;
                         if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") != 0){
-                                if((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) >= 0)){
+                                if((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) > 0)){
                                         if(tipo==tipo_temp){
                                                 totaleEntriesPeriodo+=quanti;
                                         }
                                 }
                         }
                         if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") != 0){
-                                if(difftime(max_date_given, date_tmp) >= 0){
+                                if(difftime(max_date_given, date_tmp) > 0){
                                         if(tipo==tipo_temp){
                                                 totaleEntriesPeriodo+=quanti;
                                         }
@@ -622,17 +621,17 @@ void scriviAggr(char*bound1, char*bound2, char aggr, int tipo, int modalita){
                         sprintf(directory,"%s%i" ,"./txtPeer/",myInfo.porta);
                         mkdir(directory, 0777);
                         fd = fopen(filename, "w");
-
+		}
                         if(modalita){
                                 fprintf(fd, "Aggregato %c %i %d", aggr, tipo, sendAggregato.totale);
-                                printf("Aggregato %c %i %d", aggr, tipo, sendAggregato.totale);
+                                printf("Aggregato: %c %i %d\n\n", aggr, tipo, sendAggregato.totale);
                         }
                         else{
                                 fprintf(fd, "Aggregato %c %i %d", aggr, tipo, totale);
-                                printf( "Aggregato %c %i %d", aggr, tipo, totale);
+                                printf( "Aggregato: %c %i %d\n\n", aggr, tipo, totale);
                         }
                         fclose(fd);
-                }
+
         }
 
 }
@@ -642,7 +641,7 @@ int controllaAggr(char*bound1, char*bound2, char aggr, int tipo){
         char filename[MAX_FILE];
         char aggregato[11];
         int totale;
-        char bound2_temp[MAX_DATA];
+        char bound2_temp[MAX_DATA+20];
         strcpy(bound2_temp, bound2);
         trovaTempo();
         if(strcmp(bound2,"*")==0){
@@ -656,13 +655,12 @@ int controllaAggr(char*bound1, char*bound2, char aggr, int tipo){
                 return 0;
         }
         else{
-
                 printf("Possiedo l'aggregato\n\n" );
         }
 
         if(aggr=='v'){
                 printf("AGGREGATO RICHIESTO: \n\n" );
-                while(fscanf(fd, "%s %i\n", bound2_temp, totale) != EOF) {
+                while(fscanf(fd, "%s %i\n", bound2_temp, &totale) != EOF) {
                         printf( "%s %i\n", bound2_temp, totale);
                 }
 
@@ -670,7 +668,7 @@ int controllaAggr(char*bound1, char*bound2, char aggr, int tipo){
         else{
                 printf("AGGREGATO RICHIESTO: \n\n" );
                 fscanf(fd, "%s %c %i %i\n", aggregato, &aggr, &tipo, &totale );
-                printf( "%s %c %i %i\n", aggregato, &aggr, &tipo, &totale );
+                printf( "%s %c %i %i\n", aggregato, aggr, tipo, totale );
                 sendAggregato.aggr=aggr;
         }
         fclose(fd);
@@ -700,7 +698,7 @@ int entryPresente(char* entry){
                 ret = sprintf(e, "%s %i %i %i", tm, t, q, p);
                 e[ret] = '\0';
                 if(strcmp(entry, e) == 0){
-                        printf("Entry gia' presente, da non inserire\n");
+                        printf("Entry gia' presente, da non inserire\n\n");
                         return 1;
                 }
         }
@@ -715,6 +713,7 @@ int inviaEntriesMancanti(int req_port, int tipo, char bound1[MAX_DATA], char bou
         FILE *fd;
         char filename[MAX_FILE];
         char whole_entry[MAX_UPDATEENTRY];
+	char temp_buffer[MAX_ENTRY];
         int ret;
         int porta;
         int quanti=0;
@@ -760,12 +759,17 @@ int inviaEntriesMancanti(int req_port, int tipo, char bound1[MAX_DATA], char bou
                 strptime(date, "%d_%m_%Y", &dateToConvert);
                 date_tmp = mktime(&dateToConvert)+3600;
                         if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") != 0){
-                                if((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) >= 0)){
+                                if((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) > 0)){
                                         if(tipo==tipo_temp){
                                                 ret = sprintf(whole_entry, "%s  %i %s %i %i", header, tipo, date, quanti, porta);
                                                 whole_entry[ret] = '\0';
                                                 inviaUDP(sd, whole_entry, ret, req_port);
+						riceviUDP(sd, temp_buffer, MAX_SOMMA);
+						if(strcmp(temp_buffer, "FLOODST0") == 0){
+			                                printf("%s\n","Il richiedente ha tutte le entries, mi devo fermare\n\n>");
+			                                miDevoFermare=1;
 
+			                        }
                                                 if(miDevoFermare){
                                                         return 1;
                                                 }
@@ -773,25 +777,35 @@ int inviaEntriesMancanti(int req_port, int tipo, char bound1[MAX_DATA], char bou
                                 }
                         }
                         if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") != 0){
-                                if(difftime(max_date_given, date_tmp) >= 0){
+                                if(difftime(max_date_given, date_tmp) > 0){
                                         if(tipo==tipo_temp){
                                                 ret = sprintf(whole_entry, "%s  %i %s %i %i", header, tipo, date, quanti, porta);
                                                 whole_entry[ret] = '\0';
                                                 inviaUDP(sd, whole_entry, ret, req_port);
+						riceviUDP(sd, temp_buffer, MAX_SOMMA);
+						if(strcmp(temp_buffer, "FLOODST0") == 0){
+			                                printf("%s\n","Il richiedente ha tutte le entries, mi devo fermare\n\n>");
+			                                miDevoFermare=1;
 
+			                        }
                                                 if(miDevoFermare){
                                                         return 1;
                                                 }
                                         }
                                 }
                         }
-                        if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") != 0){
+                        if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") == 0){
                                 if((difftime(min_date_given, date_tmp) <= 0)){
                                         if(tipo==tipo_temp){
                                                 ret = sprintf(whole_entry, "%s  %i %s %i %i", header, tipo, date, quanti, porta);
                                                 whole_entry[ret] = '\0';
                                                 inviaUDP(sd, whole_entry, ret, req_port);
+						riceviUDP(sd, temp_buffer, MAX_SOMMA);
+						if(strcmp(temp_buffer, "FLOODST0") == 0){
+			                                printf("%s\n","Il richiedente ha tutte le entries, mi devo fermare\n\n>");
+			                                miDevoFermare=1;
 
+			                        }
                                                 if(miDevoFermare){
                                                         return 1;
                                                 }
@@ -803,7 +817,12 @@ int inviaEntriesMancanti(int req_port, int tipo, char bound1[MAX_DATA], char bou
                                         ret = sprintf(whole_entry, "%s  %i %s %i %i", header, tipo, date, quanti, porta);
                                         whole_entry[ret] = '\0';
                                         inviaUDP(sd, whole_entry, ret, req_port);
+					riceviUDP(sd, temp_buffer, MAX_SOMMA);
+					if(strcmp(temp_buffer, "FLOODST0") == 0){
+						printf("%s\n","Il richiedente ha tutte le entries, mi devo fermare\n\n>");
+						miDevoFermare=1;
 
+					}
                                         if(miDevoFermare){
                                                 return 1;
                                         }

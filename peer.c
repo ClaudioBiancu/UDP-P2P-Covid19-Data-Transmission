@@ -250,7 +250,7 @@ void get(char*parola){
 
                                 sscanf(get_buffer, "%s %i", temp_buffer, &sum_entr);
                         }
-                        if(sum_entr >= 0){
+                        if(sum_entr >= 0 && aggr!='v' ){
                                 printf("Ho ottenuto il dato che cercavo\n");
                                 sendAggregato.totale=sum_entr;
                                 scriviAggr(bound[0], bound[1], aggr, tipo, 1);
@@ -278,15 +278,20 @@ void get(char*parola){
                                                 inserisciEntry(r_type, r_port);
                                                 peer_entr++;
                                                 if (peer_entr < tot_entr){
-                                                        ret = sprintf(get_buffer, "%s %i", "FLOODSTP", 1);
+                                                        ret = sprintf(get_buffer, "%s", "FLOODST1");
                                                         inviaUDP(sd, get_buffer, ret, r_port);
                                                 }
+                                                else{
+                                                        break;
+                                                }
+
                                         }
                                 }
                                 if(r_type==-1){
                                         printf("Errore nel ricezione delle Entry, fine corsa\n");
                                 }
-
+                                ret = sprintf(get_buffer, "%s", "FLOODST0");
+                                inviaUDP(sd, get_buffer, ret, r_port);
 
 
                                 printf("Tutte le entries necessarie sono arrivate a destinazione\n\n");
@@ -333,7 +338,7 @@ void guidaPeer(char* comando){
 }
 
 void interfacciaPeerStart(){
-        printf("\n****************************************************** Peer Covid-19 ******************************************************\n\n");
+        printf("\n************************************************ Peer Covid-19 %i******************************************************\n\n", myInfo.porta);
         guidaPeer(NULL);
         printf("\n***************************************************************************************************************************\n");
         return;
@@ -490,7 +495,6 @@ int main(int argc, char* argv[]){
 
 
                         else if(util_port == myInfo.vicino1 || util_port == myInfo.vicino2){
-                                printf("Messaggio %s arrivato dal vicino %d\n", buffer, util_port);
                                 //Vicino chiede se esiste dato aggregato
                                 if(strcmp(temp_buffer, "REQ_DATA") == 0){
                                         int req_port;
@@ -558,23 +562,20 @@ int main(int argc, char* argv[]){
                                                         if(!miDevoFermare){
                                                                 ret = sprintf(bufferErr, "%s %i %s  %i %i", "FLOODREP",-1, "fineCorsa", 0, myInfo.porta);
                                                                 inviaUDP(sd, bufferErr, strlen(buffer), req_port);
-                                                                miDevoFermare=0;
+                                                                miDevoFermare=1;
                                                         }
                                                 }
                                                 else{
                                                         if(!miDevoFermare){
                                                                 inviaUDP(sd, buffer, strlen(buffer), myInfo.vicino1);
+                                                                miDevoFermare=1;
                                                         }
                                                 }
                                         }
                                         miDevoFermare=0;
                                 }
                         }
-                        if(strcmp(temp_buffer, "FLOODSTP") == 0){
-                                printf("%s\n","Il richiedente ha tutte le entries, mi devo fermare");
-                                miDevoFermare=1;
 
-                        }
 
                         FD_CLR(sd, &readset);
                 }
