@@ -18,17 +18,17 @@
 #define MAX_SOCKET_RECV 630 //Dimentsione massima messaggio ricevuto
 #define MAX_TIPO 15 //Dimensione massima tipo richiesta al ds
 #define MAX_LISTA 21 //Dimensione massima lista vicini
-#define MAX_DATA 15
+#define MAX_DATA 15 // Dimensione massima per gli array che contengono una data
 #define MAX_TEMPO 8
-#define MAX_FILE 31
+#define MAX_FILE 31 // Dinesione massima per il path di un file da utilizzare
 #define MAX_SOMMA 19 //Per scelta progettuale i dati aggregati sono al massimo dell'ordine di un miliardo
-#define MAX_ENTRY 16
-#define TREMILASEICENTO 3600
+#define MAX_ENTRY 30
+#define TREMILASEICENTO 3600 //secondi da aggiungere quando converto una dat
 /****************FINE COSTANTI********************/
 
 /********************************VARIABILI*********************************/
-int sd;
-int peersConnessi=0;
+int sd;//descrittore del socket
+int peersConnessi=0;//numero di peers connessi
 int EntriesGiornaliere;
 char buffer[BUFLEN];//buffer gestione socket
 char recv_buffer[BUFLEN]; //Messaggio di richiesta connessione
@@ -38,37 +38,38 @@ fd_set readset; //set di descrittori pronti
 fd_set master; // set di descrittori da monitorare
 int fdmax; //Descrittore max
 
-struct Entry {
+struct Entry {//Struttura di appoggio per la gestione dell-inserimento delle entry
 	char date[11];
 	int num_entry_N;;
 	int num_entry_T;
 } DS_entry;
 
 struct Entry trovaEntry;
-time_t tempoOraTemp;
+time_t tempoOraTemp; //variabili d'appoggio per gestire il tempo corrente
 struct tm* tmOraTemp;
 
-struct tm convertiData;
+struct tm convertiData;//Variabile di servizio per convertire le date nel formato corretto e darle in pasto al datediff
 time_t dataminima, datamassima, date_tmp;
 
 struct timeval *timeout;
-char dataOra[MAX_DATA+1];
+char dataOra[MAX_DATA+1];//Varibili che vengono utilizzate per inserire la data corrente nelle entry
 char tempoOra[MAX_TEMPO+1];
-int debug=0;
+int debug=0;// la variabile debug e' possibile all-occorrenza settarla per avere l-aggiornamento dei registri in continuazione, per debug senza aspettare le 18
 /*****************************FINE VARIABILI*********************************/
 
 
 
 
 void pulisciIndirizzi(struct sockaddr_in* addr_p,  int port){
-    memset(addr_p, 0, sizeof((*addr_p)));
+    	memset(addr_p, 0, sizeof((*addr_p)));
 	addr_p->sin_family = AF_INET;
 	addr_p->sin_port = htons(port);
 	inet_pton(AF_INET, LOCALHOST, &addr_p->sin_addr);
 }
 
 
-
+//Crea il socket UDP collegandosi al server con indirizzo passato come primo parametro
+//e alla porta passata come secondo parametro, restituisce un descrittore di socket
 int creaSocketAscolto(struct sockaddr_in* my_addr,int porta) {
         int sd;
         int ret;
@@ -83,7 +84,7 @@ int creaSocketAscolto(struct sockaddr_in* my_addr,int porta) {
         return sd;
 }
 
-int riceviUDP(int socket, char* buffer, int buff_l){
+int riceviUDP(int socket, char* buffer, int buff_l){//funzione che utilizzo per la ricezione dei messaggi UDP
         int ret;
         struct sockaddr_in send_addr;
         socklen_t send_addr_len;
@@ -94,7 +95,7 @@ int riceviUDP(int socket, char* buffer, int buff_l){
         return ntohs(send_addr.sin_port);
 }
 
-void inviaUDP(int socket, char* buffer, int buff_l, int recv_port){
+void inviaUDP(int socket, char* buffer, int buff_l, int recv_port){//funzione che utilizzo per l'invio dei messaggi UDP
         int ret;
         struct sockaddr_in recv_addr;
         socklen_t recv_addr_len;
@@ -115,24 +116,24 @@ void inviaUDP(int socket, char* buffer, int buff_l, int recv_port){
 
 
 /***************** GESTORE FILE********************/
-int alreadyBooted(int porta){
+int alreadyBooted(int porta){//controllo se un peer si e' gia' connesso precedentemente
     FILE *fd;
     char temp_buffer[INET_ADDRSTRLEN];
     int temp;
 
-    fd = fopen("./txtDS/bootedPeers.txt", "r");
+    fd = fopen("./txtDS/bootedPeers.txt", "r");//Apro il file contenente tutti i peer registrati
 
     if(fd){
         while(fscanf(fd, "%s %d", temp_buffer, &temp)==2){
             if(temp == porta)
-                return 1;
+                return 1;//Se lo trovo devo restituire 1;
         }
     }
 
     return 0;
 }
 
-int inserisci_peer(char* addr, int port, int peersConnessi){
+int inserisci_peer(char* addr, int port, int peersConnessi){ //Inserisci un peer nell-anello su file
         FILE *fp, *temp;
         int m, f, servo;
         int temp_port[2];
@@ -227,6 +228,8 @@ int inserisci_peer(char* addr, int port, int peersConnessi){
         return -1;
 }
 
+
+//Devo rimuovere un peer dalla lista, la utilizzo quando spengo il server o quando esce
 void rimuoviPeer(int port){
         FILE *fd, *temp;
         char temp_buffer[INET_ADDRSTRLEN];
@@ -343,7 +346,7 @@ void trovaLista(int peer, int peersConnessi, char* mess_type, char* list_buffer,
         printf("Lista preparata: %s\n", list_buffer);
 }
 
-void trovaTempo(){
+void trovaTempo(){//Aggiorna delle variabili che utilizzo per salvare il tempo o la data corrente
 
     tempoOraTemp = time(NULL);
     tmOraTemp = gmtime(&tempoOraTemp);
@@ -363,7 +366,7 @@ void trovaTempo(){
 
 
 
-void inserisciEntry(){
+void inserisciEntry(){// Inserisce un Entry alla ricezione
         FILE *fd1;
         char filename[MAX_FILE];
         trovaTempo();
@@ -376,7 +379,7 @@ void inserisciEntry(){
         }
         else {
                 printf("Entry Inserita\n\n>" );
-                trovaTempo();
+                trovaTempo();//Ottengo la data di oggi
                 strftime(DS_entry.date, sizeof(DS_entry.date), "%d_%m_%Y", tmOraTemp);
                 fprintf(fd1, "%s %i %i\n", DS_entry.date, DS_entry.num_entry_N, DS_entry.num_entry_T);
                 DS_entry.num_entry_N=0;
@@ -386,7 +389,7 @@ void inserisciEntry(){
 }
 
 
-int leggiEntries(int tipo, char bound1[MAX_DATA], char bound2[MAX_DATA], int portaPeer){
+int leggiEntries(int tipo, char bound1[MAX_DATA], char bound2[MAX_DATA], int portaPeer){//Resituisce il numero di Entry presenti in un certo Bound
         FILE *fd;
         char filename[MAX_FILE];
         int totaleEntriesPeriodo=0;
@@ -426,8 +429,8 @@ int leggiEntries(int tipo, char bound1[MAX_DATA], char bound2[MAX_DATA], int por
 
                 strptime(trovaEntry.date, "%d_%m_%Y", &convertiData);
                 date_tmp = mktime(&convertiData)+3600;
-                        if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") != 0){
-                                if((difftime(dataminima, date_tmp) <= 0) && (difftime(datamassima, date_tmp) >= 0)){
+                        if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") != 0){//se il bound e' completamente limitato
+                                if((difftime(dataminima, date_tmp) <= 0) && (difftime(datamassima, date_tmp) >= 0)){//Utilizzo datediff per ottenere la differenza di giorni in secondi
                                         if(!tipo)
                                                 totaleEntriesPeriodo+=trovaEntry.num_entry_N;
                                         else
@@ -435,23 +438,23 @@ int leggiEntries(int tipo, char bound1[MAX_DATA], char bound2[MAX_DATA], int por
 
                                 }
                         }
-                        if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") != 0){
-                                if(difftime(datamassima, date_tmp) >= 0){
+                        if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") != 0){ //se il bound e' limitato a destra
+                                if(difftime(datamassima, date_tmp) >= 0){//Utilizzo datediff per ottenere la differenza di giorni in secondi
                                         if(!tipo)
                                                 totaleEntriesPeriodo+=trovaEntry.num_entry_N;
                                         else
                                                 totaleEntriesPeriodo+=trovaEntry.num_entry_T;
                                 }
                         }
-                        if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") == 0){
-                                if((difftime(dataminima, date_tmp) <= 0)){
+                        if(strcmp(bound1, "*") != 0 && strcmp(bound2, "*") == 0){//se il bound e' limitato a sinistra
+                                if((difftime(dataminima, date_tmp) <= 0)){//Utilizzo datediff per ottenere la differenza di giorni in secondi
                                         if(!tipo)
                                                 totaleEntriesPeriodo+=trovaEntry.num_entry_N;
                                         else
                                                 totaleEntriesPeriodo+=trovaEntry.num_entry_T;
                                 }
                         }
-                        if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") == 0){
+                        if(strcmp(bound1, "*") == 0 && strcmp(bound2, "*") == 0){//se il bound e' completamente illimitato
                                 if(!tipo)
                                         totaleEntriesPeriodo+=trovaEntry.num_entry_N;
                                 else
@@ -462,13 +465,13 @@ int leggiEntries(int tipo, char bound1[MAX_DATA], char bound2[MAX_DATA], int por
         }
         ret = sprintf(entr_repl, "%s %i", "ENTR_REP", totaleEntriesPeriodo);
         entr_repl[ret] = '\0';
-        inviaUDP(sd, entr_repl, ret, portaPeer);
+        inviaUDP(sd, entr_repl, ret, portaPeer);//Invio al peer richiedente
         printf("\n\n>");
         return 1;
 }
 
 
-void stampaPeers(int peersConnessi){
+void stampaPeers(int peersConnessi){//Utilizzata da showpeers
     int i;
     printf("Peer connessi alla rete:");
     if(!peersConnessi)
@@ -480,7 +483,7 @@ void stampaPeers(int peersConnessi){
     printf("\n");
 }
 
-void stampaVicino(int peersConnessi, int porta){
+void stampaVicino(int peersConnessi, int porta){//Utilizzata da showneighbor con passaggio di porta
     if(!alreadyBooted(porta))
         printf("Peer %d non connesso alla rete!\n", porta);
     else {
@@ -496,7 +499,7 @@ void stampaVicino(int peersConnessi, int porta){
     }
 }
 
-void stampaTuttiVicini(int peersConnessi){
+void stampaTuttiVicini(int peersConnessi){//Utilizzata da showneighbor con passaggio di porta
     int i;
     switch(peersConnessi){
         case 1:

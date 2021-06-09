@@ -5,8 +5,7 @@
 
 
 ///////////////////////////Funzioni per i COMANDI//////////////////
-/*  Controlla che il peer non sia già registrato sul DS. In caso negativo controlla che i parametri siano inseriti correttamente e successivamente
-    chiama le funzioni per la creazione del socket e per la registrazione sul DS.
+/*  Controlla che il peer non sia già registrato sul DS. In caso negativo controlla che i parametri siano inseriti correttamente. Riceve i vicini dal Server e aggiorna i suoi dati
 */
 void start(char*parola){
         int porta;
@@ -69,7 +68,7 @@ void start(char*parola){
 
 }
 
-void add(char*parola){
+void add(char*parola){// Aggiunge una Entry, dopo aver fatto tutti i controlli necessari
         char tipo;
         int quanto;
 
@@ -105,7 +104,7 @@ void add(char*parola){
 
         printf("Formato comando Corretto\n");
 
-        if(tipo=='N'){
+        if(tipo=='N'){//Aggiorna le variabili che il client inviera' alle 18
                 Peer_entry.num_entry_N=quanto;
                 NumeroEntryN++;
                 inserisciEntry(0, myInfo.porta);
@@ -121,20 +120,20 @@ void add(char*parola){
 
 }
 
-void get(char*parola){
+void get(char*parola){// funzione per ottenere aggregati
         char aggr;
         int tipo;
         char bound[2][MAX_DATA+1];
         int ret=3; //Inizialmente lo uso per gestire il numero dei parametri, che minimo sono 3
-        int tot_entr;
-        int peer_entr;
+        int tot_entr;//entry dal server
+        int peer_entr;//entry presenti nel server
         int sum_entr;
         int temp_buffer[200];
         char get_buffer[200]; //Ricevere il messaggio
         char util_buffer[200];
         char date_buffer[200];
         char altro_buffer[MAX_SOMMA];
-        int r_aggr;
+        int r_aggr;//variabili temporanee per gestire i vari invii e la ricezione dei messaggi
         int r_type;
         int r_quantity;
         char r_bound1[18];
@@ -143,6 +142,7 @@ void get(char*parola){
         char control_buffer[7];
         int r_port;
         char* isIn;
+        int ricevente;//porta del peer da cui ricevo le entry
 
         //Se peer non connesso non faccio nulla
         if(portaServer == -1){
@@ -201,11 +201,11 @@ void get(char*parola){
                         return;
         }
 
-        if((strcmp(bound[0], "*")==0 || strcmp(bound[1], "*")==0 ) && aggr=='v'){
+        if((strcmp(bound[0], "*")==0 || strcmp(bound[1], "*")==0 ) && aggr=='v'){// Non e' stata implementata i bound infiniti per la variazione
                 printf("Per calcolare un aggregato di tipo variazione inserisci un periodo limitato \n\n");
                 return;
         }
-        if(controllaAggr(bound[0], bound[1], aggr, tipo)){
+        if(controllaAggr(bound[0], bound[1], aggr, tipo)){//Controllo se possiedo gia' l'aggregato in caso lo stampo ed esco
                 return;
         }
 
@@ -214,30 +214,33 @@ void get(char*parola){
         ret = sprintf(get_buffer, "%s %i %s %s", "ENTR_REQ", tipo, bound[0], bound[1]);
         inviaUDP(sd, get_buffer, ret, portaServer);
 
-        //Ricevo risposta
+        //Ricevo come risposta il numero di entry necessarie a calcolare il dato, dal DS
         riceviUDP(sd, get_buffer, MAX_ENTRY);
 
         sscanf(get_buffer, "%s %i", temp_buffer, &tot_entr);
 
-        peer_entr = contaEntries(tipo, bound[0], bound[1]);
+        peer_entr = contaEntries(tipo, bound[0], bound[1]); //conto quante entries ho, in caso siano uguali al numero ricevuto dal server posso direttamente calcolare l'aggregato
 
         printf("Entries nel server: %d; entries qui: %d\n", tot_entr, peer_entr);
 
         //Se nessuna entry, inutile continuare
-        if(!tot_entr)
+        if(!tot_entr){
                 printf("Nessun dato aggregato da calcolare\n");
+                return;
+        }
         //Se ho tutti i dati che servono, eseguo il calcolo e lo scrivo
         if((tot_entr == peer_entr ) && tot_entr){
                 scriviAggr(bound[0], bound[1], aggr, tipo, 0);
                 return;
         }
+
         //Altrimenti
         else {
                 //Se non ho vicini non posso calcolare nulla
                 if(myInfo.vicino1 == -1 && myInfo.vicino2 == -1)
-                        printf("Non ho vicini collegati, non posso risolvere in questo momento\n");
+                        printf("Non ho vicini collegati, non posso risolvere in questo momento\n\n>");
 
-                else { if(aggr!='v'){
+                else { if(aggr!='v'){//Se il dato richiesto e' di tipo aggregato v non e' previsto richiedere il dato aggregato gia' pronto, ma si procede direttamente con il flood
                                 printf("Devo chiedere informazioni ai miei vicini\n");
                                 //Controllo se qualche peer ha il dato aggregato pronto
                                 sprintf(get_buffer, "%s %i %s %s", "ENTR_REQ", tipo, bound[0], bound[1]);
@@ -250,7 +253,7 @@ void get(char*parola){
 
                                 sscanf(get_buffer, "%s %i", temp_buffer, &sum_entr);
                         }
-                        if(sum_entr >= 0 && aggr!='v' ){
+                        if(sum_entr >= 0 && aggr!='v' ){// Se un peer mi risponde con un valore positivo di sum entry significa che mi ha mandato l'aggregato
                                 printf("Ho ottenuto il dato che cercavo\n");
                                 sendAggregato.totale=sum_entr;
                                 scriviAggr(bound[0], bound[1], aggr, tipo, 1);
@@ -266,10 +269,10 @@ void get(char*parola){
                                 while(peer_entr < tot_entr){
                                         //Nuove entries: possono arrivare da tutti
                                         ret = (myInfo.vicino1 != -1) ? 1 : 0;
-                                        riceviUDP(sd, altro_buffer, MAX_UPDATEENTRY);
+                                        ricevente=riceviUDP(sd, altro_buffer, MAX_UPDATEENTRY);//ricevo le entry dal flood
                                         sscanf(altro_buffer,  "%s %i %s %i %i", util_buffer, &r_type, date_buffer, &r_quantity, &r_port);
-                                        if(r_type==-1)
-                                                continue;
+                                        if(r_type==-1) //se mi mandano un tipo negativo significa che devo fermarmi perche' l'entry non e' disponibile
+                                                break;
                                         ret = sprintf(altro_buffer, "%s %i %i %i", date_buffer, r_type, r_quantity, r_port);
                                         altro_buffer[ret] = 0;
                                         if(!entryPresente(altro_buffer)){
@@ -277,28 +280,25 @@ void get(char*parola){
                                                 strcpy(Peer_entry.date, date_buffer);
                                                 inserisciEntry(r_type, r_port);
                                                 peer_entr++;
-                                                if (peer_entr < tot_entr){
-                                                        ret = sprintf(get_buffer, "%s", "FLOODST1");
-                                                        inviaUDP(sd, get_buffer, ret, r_port);
-                                                }
-                                                else{
-                                                        break;
-                                                }
-
+                                        }
+                                        if (peer_entr < tot_entr){
+                                                ret = sprintf(get_buffer, "%s", "FLOODST1");
+                                                inviaUDP(sd, get_buffer, ret, ricevente);
+                                        }
+                                        else{
+                                                break;
                                         }
                                 }
                                 if(r_type==-1){
                                         printf("Errore nel ricezione delle Entry, fine corsa\n");
+                                        return;
                                 }
                                 ret = sprintf(get_buffer, "%s", "FLOODST0");
-                                inviaUDP(sd, get_buffer, ret, r_port);
+                                inviaUDP(sd, get_buffer, ret, ricevente);
 
 
                                 printf("Tutte le entries necessarie sono arrivate a destinazione\n\n");
-                                //Eseguo il calcolo
-                                //sum_entr = sommaEntries(tipo, myInfo.porta);
-                                //Lo riporto sul file
-                                scriviAggr(bound[0], bound[1], aggr, tipo, 0);
+                                scriviAggr(bound[0], bound[1], aggr, tipo, 0);//Le entry sono gia' arrivate, quindi basta che scrivo l'aggregato
                         }
                 }
         }
@@ -566,10 +566,8 @@ int main(int argc, char* argv[]){
                                                         }
                                                 }
                                                 else{
-                                                        if(!miDevoFermare){
                                                                 inviaUDP(sd, buffer, strlen(buffer), myInfo.vicino1);
                                                                 miDevoFermare=1;
-                                                        }
                                                 }
                                         }
                                         miDevoFermare=0;

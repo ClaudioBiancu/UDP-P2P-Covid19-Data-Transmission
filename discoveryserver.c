@@ -1,15 +1,15 @@
-#include "./utility/utility_ds.c"
+#include "./utility/utility_ds.c"// include funzioni di utilita'
 
 
 
 /********************************SEZIONE OPERATIVA DISCOVERY SERVER****************************/
 
 
-void showpeers(){
+void showpeers(){//mostra i peer connessi
         stampaPeers(peersConnessi);
 }
 
-void showneighbor(char*parola){
+void showneighbor(char*parola){// mostra i peer connessi, se specificata anche la porta mostra anche i peer vicini
         int porta;
         if(peersConnessi == 0){
                 printf("Nessun peer connesso\n");
@@ -259,7 +259,7 @@ int main(int argc, char* argv[]){
                         peersConnessi--;
                         }
 
-                        if(strcmp(recv_buffer, "NEW_ENTR") == 0){
+                        if(strcmp(recv_buffer, "NEW_ENTR") == 0){// Ricevo una nuova entry da un peer, e aggiorno le variabili che mi serviranno per modificare il registro
                                 int n;
                                 int t;
                                 sscanf(buffer, "%s %i %i", recv_buffer, &n, &t);
@@ -270,7 +270,7 @@ int main(int argc, char* argv[]){
 
                         }
 
-                        if(strcmp(recv_buffer, "ENTR_REQ") == 0){
+                        if(strcmp(recv_buffer, "ENTR_REQ") == 0){//Restituisco il numero di entries che ho in quel range
                                 int tipo;
                                 char bound1[MAX_DATA];
                                 char bound2[MAX_DATA];

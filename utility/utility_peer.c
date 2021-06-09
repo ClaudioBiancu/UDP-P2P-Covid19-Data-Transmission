@@ -22,21 +22,17 @@
 #define MAX_SOCKET_RECV 630 //Dimentsione massima messaggio ricevuto
 #define MAX_TIPO 8 //Dimensione massima tipo richiesta al ds
 #define MAX_LISTA 21 //Dimensione massima lista vicini
-#define TIPO_ENTRY 10
-#define MAX_DATA 15
+#define TIPO_ENTRY 10 // Dimensione Massima dell'header del messaggio
+#define MAX_DATA 15 // Dimensione massima per gli array che contengono una data
 #define MAX_TEMPO 8
-#define MAX_FILE 31
-#define ATTESA_BOOT 5
-#define MAX_SOMMA 19
-#define MAX_PEERS 100
-#define MAX_ENTRY 30
+#define MAX_FILE 31// Dinesione massima per il path di un file da utilizzare
+#define ATTESA_BOOT 5 //Attesa che il server risponda alla richiesta di boot
+#define MAX_SOMMA 19 //
+#define MAX_PEERS 100 //Numero massimo dei
+#define MAX_ENTRY 30 //Dimentsione massima di una Entry
 #define MAX_UPDATEENTRY 630
-#define TZ  3600
-#define MAX_ARRAY 365 //scelta progettuale variazione su massimo un anno
-
-
-
-
+#define TZ  3600 //secondi da aggiungere quando converto una data
+#define MAX_ARRAY 366 //Variazione su massimo un anno, scelta progettuale//da inserire controllo
 /***************** FINE COSTANTI********************/
 
 /********************************VARIABILI*********************************/
@@ -61,7 +57,7 @@ struct Entry {
 	int num_entry_T;
 } Peer_entry;
 
-struct EntrySomma{
+struct EntrySomma{ //Struttura di appoggio per la gestione dell-inserimento delle entry
         char data[MAX_DATA];
         int tipo;
         int quanti;
@@ -75,7 +71,7 @@ struct Peer{
         int vicino2;
 } myInfo;
 
-struct Aggregato{
+struct Aggregato{ //Struttura di appoggio per la gestione dell-inserimento degli aggregati
         char bound1[11];
         char bound2[11];
         char aggr;
@@ -90,13 +86,13 @@ time_t tempoOraTemp;
 struct tm* tmOraTemp;
 int miDevoFermare=0;
 
-struct tm dateToConvert;
+struct tm dateToConvert; //Variabile di servizio per convertire le date nel formato corretto e darle in pasto al datediff
 time_t min_date_given, max_date_given, date_tmp, ultimaData_temp;
 struct timeval *timeout;
-char dataOra[MAX_DATA+1];
+char dataOra[MAX_DATA+1];//Varibili che vengono utilizzate per inserire la data corrente nelle entry
 char tempoOra[MAX_TEMPO+1];
 
-int debug=0;
+int debug=0;// la variabile debug e' possibile all-occorrenza settarla per avere l-aggiornamento dei registri in continuazione, per debug senza aspettare le 18
 /*****************************FINE VARIABILI*********************************/
 
 
@@ -155,7 +151,7 @@ void inviaUDP(int socket, char* buff, int buff_l, int recv_port){
 
 
 
-void inviaEntryDS() {
+void inviaEntryDS() { //Alle 18 invio le entry al ds e le riazzero, chiamata dalla funzione checkTime
         char nuovaEntry[TIPO_ENTRY+1];
         printf("invio Entries %i %i\n", NumeroEntryN, NumeroEntryT);
         ret = sprintf(nuovaEntry, "%s %i %i", "NEW_ENTR", NumeroEntryN, NumeroEntryT);
@@ -176,6 +172,7 @@ void trovaTempo(){
         tempoOra[MAX_TEMPO] = '\0';
 }
 
+//Controlli sulle date passate
 int periodoValido(int *date1, int *date2, char aggr){
         return (date1[0] < date2[0] || (date1[0] == date2[0] && (date1[1] < date2[1] || (date1[1] == date2[1] && (date1[2] < date2[2] || (date1[2] == date2[2] && aggr == 't'))))));
 }
@@ -212,16 +209,7 @@ int dataValida(int y, int m, int d){
         return 1;
 }
 
-int oggi(char* bound_date){
-        int b_date[3];
-        int c_date[3];
 
-        trovaTempo();
-        sscanf(bound_date, "%d:%d:%d", &b_date[2], &b_date[1], &b_date[0]);
-        sscanf(dataOra, "%d:%d:%d", &c_date[0], &c_date[1], &c_date[2]);
-
-        return (b_date[0] == c_date[0] && b_date[1] == c_date[1] && b_date[2] == c_date[2]);
-}
 
 //Controllo che le date input della get siano valide
 int controllaDate(char *date1, char *date2, char aggr){
@@ -260,7 +248,6 @@ int controllaDate(char *date1, char *date2, char aggr){
                 return 0;
                 }
         }
-        //Se una data corrisponde a oggi e il register non e' ancora chiuso, cioe' non sono ancora le 18, non si potra' eseguire la get
 
 
 
@@ -273,7 +260,7 @@ int controllaDate(char *date1, char *date2, char aggr){
 
 /***************** GESTORE FILE********************/
 
-void inserisciEntry(int tipo, int portaNuova){
+void inserisciEntry(int tipo, int portaNuova){ //Inserisce una nuova Entry su file
 
         FILE *fd1;
         char filename[MAX_FILE];
@@ -301,7 +288,7 @@ void inserisciEntry(int tipo, int portaNuova){
         fclose(fd1);
 }
 
-
+//Conta le Entries da confrontare con quelle del
 int contaEntries(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
         FILE *fd;
         char filename[MAX_FILE];
@@ -316,16 +303,15 @@ int contaEntries(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
         dateToConvert.tm_hour = dateToConvert.tm_min = dateToConvert.tm_sec = 0;
 
         int appoggioData[2][3];
-        //Controllo sulla prima data
 
-
+	//Controllo sulla prima data, la trasformo in un formato time_t leggibile dal difftime
         if(strcmp(bound1, "*") != 0) {
                 sscanf(bound1, "%d:%d:%d", &appoggioData[0][2], &appoggioData[0][1], &appoggioData[0][0]);
                 sprintf(bound1_temp, "%i_%i_%i",appoggioData[0][2], appoggioData[0][1], appoggioData[0][0]);
                 strptime(bound1_temp, "%d_%m_%Y", &dateToConvert);
                 min_date_given = mktime(&dateToConvert)+TZ;\
         }
-
+	//Controllo sulla seconda data, la trasformo in un formato time_t leggibile dal difftime
         if(strcmp(bound2, "*") != 0) {
                 sscanf(bound2, "%d:%d:%d", &appoggioData[1][2], &appoggioData[1][1], &appoggioData[1][0]);
                 sprintf(bound2_temp, "%i_%i_%i", appoggioData[1][2], appoggioData[1][1], appoggioData[1][0]);
@@ -378,12 +364,13 @@ int contaEntries(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
 
 
 
-
+//Trasforma una data char nel formato time_t
 time_t trasforma(char data[MAX_DATA]){
         strptime(data, "%d_%m_%Y", &dateToConvert);
         return mktime(&dateToConvert)+3600;
 
 }
+// calcola la differenza giorni tra due time_t, uno dei quali viene convertito con la funzione sopra
 int differenzaGiorni(char bound2[MAX_DATA], time_t ultima){
         float giorni;
         giorni=(difftime(ultima, trasforma(bound2)));
@@ -392,6 +379,8 @@ int differenzaGiorni(char bound2[MAX_DATA], time_t ultima){
 
 }
 
+
+//Esegue il calcolo della variazione richiesta
 int calcolaVariazioneTIPO(char bound1[MAX_DATA], char bound2[MAX_DATA], int tipo, char aggr){
         FILE *fd;
         char filename[MAX_FILE];
@@ -412,6 +401,7 @@ int calcolaVariazioneTIPO(char bound1[MAX_DATA], char bound2[MAX_DATA], int tipo
         int appoggioData[2][3];
         int misuraArray;
 
+	//apre il file delle entry per leggerle e trovare i dati da calcolare
         sprintf(filename, "%s%s_%d.txt", "./txtPeer/", "entries", myInfo.porta);
         fd = fopen(filename, "r");
         if(fd == NULL){
@@ -420,7 +410,7 @@ int calcolaVariazioneTIPO(char bound1[MAX_DATA], char bound2[MAX_DATA], int tipo
         }
 
 
-
+	//converte i bound passati in modo che siano adatti
         sscanf(bound1, "%d:%d:%d", &appoggioData[0][2], &appoggioData[0][1], &appoggioData[0][0]);
         sprintf(bound1_temp, "%i_%i_%i",appoggioData[0][2], appoggioData[0][1], appoggioData[0][0]);
         strptime(bound1_temp, "%d_%m_%Y", &dateToConvert);
@@ -433,7 +423,7 @@ int calcolaVariazioneTIPO(char bound1[MAX_DATA], char bound2[MAX_DATA], int tipo
         max_date_given = mktime(&dateToConvert)+TZ;
 
 
-        while(fscanf(fd, "%s %i %i %i\n", date, &tipo_temp, &quanti, &porta) != EOF) {
+        while(fscanf(fd, "%s %i %i %i\n", date, &tipo_temp, &quanti, &porta) != EOF) {//prelevo tutte le entry, sommo quelle che hanno giorno e tipo uguale
                 strptime(date, "%d_%m_%Y", &dateToConvert);
                 date_tmp = mktime(&dateToConvert)+3600;
                 if(tipo_temp==tipo && ((difftime(min_date_given, date_tmp) <= 0) && (difftime(max_date_given, date_tmp) > 0))){
@@ -462,28 +452,27 @@ int calcolaVariazioneTIPO(char bound1[MAX_DATA], char bound2[MAX_DATA], int tipo
         fd = fopen(filename, "a");
         if(fd == NULL){
                 sprintf(directory,"%s%i" ,"./txtPeer/",myInfo.porta);
-                mkdir(directory, 0777);
+                mkdir(directory, 0777); // crea la cartella del peer
                 fd = fopen(filename, "a");
         }
 
-        giorni=(difftime(max_date_given, min_date_given));
+        giorni=(difftime(max_date_given, min_date_given));//trova quante variazioni dovro' calcolare facendo la differenza tra fine e inizio bound
         giorni=giorni/86400;
 
         giorni_tmp=(int)(giorni+0.5-1);// numero di giorni tra una data e l'altra;
-        printf("%i\n",giorni_tmp);
 
         contati=i;
         i=0;
         misuraArray=giorni_tmp;
         ArrayVariazione[misuraArray];
-        while(i<misuraArray){
+        while(i<misuraArray){ //azzera tutto l'array prima di inserire le entry al punto giusto
                 ArrayVariazione[i].quanti=0;
                 strcpy(ArrayVariazione[i].data,"data");
                 i++;
         }
         i=contati-1;
         while(i>=0){
-                ArrayVariazione[-differenzaGiorni(ArraySomma[i].data, min_date_given)-1].quanti=ArraySomma[i].quanti;
+                ArrayVariazione[-differenzaGiorni(ArraySomma[i].data, min_date_given)-1].quanti=ArraySomma[i].quanti;// Inserisce le entry nell'array in base alla differenza giorni tra il bound basso
                 strcpy(ArrayVariazione[-differenzaGiorni(ArraySomma[i].data, min_date_given)-1].data, ArraySomma[i].data);
                 i--;
         }
@@ -491,30 +480,30 @@ int calcolaVariazioneTIPO(char bound1[MAX_DATA], char bound2[MAX_DATA], int tipo
         printf("%s\n\n","AGGREGATO RICHIESTO:" );
         while(i>=0){
                 if(strcmp(ArrayVariazione[i].data,"data")==0 && i-1>0){
-                        printf("%i) Variazione: %i\n", i, (ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti));
-                        fprintf(fd, "%i)Variazione: %i\n", i, (ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti));
+                        printf("%i) Variazione: %i\n", i, (ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti));//scrive su file
+                        fprintf(fd, "%i)Variazione: %i\n", i, (ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti)); //Stampa a video
                 }
                 else
                         if((i-1)>0){
-                                printf("%i) Variazione al %s: %i\n", i, ArrayVariazione[i].data, ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti);
-                                fprintf(fd, "%i)Variazione_%s: %i\n", i, ArrayVariazione[i].data, ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti);
+                                printf("%i) Variazione al %s: %i\n", i, ArrayVariazione[i].data, ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti);//scrive su file
+                                fprintf(fd, "%i)Variazione_%s: %i\n", i, ArrayVariazione[i].data, ArrayVariazione[i].quanti-ArrayVariazione[i-1].quanti); //stampa a video
                         }
                 i--;
         }
         i=i+1;
         if(strcmp(ArrayVariazione[i].data,"data")==0 ){
-                printf("%i) Variazione: %i\n", i,  (ArrayVariazione[i].quanti));
-                fprintf(fd, "%i)Variazione: %i\n", i,  (ArrayVariazione[i].quanti));
+                printf("%i) Variazione: %i\n", i,  (ArrayVariazione[i].quanti));//scrive su file
+                fprintf(fd, "%i)Variazione: %i\n", i,  (ArrayVariazione[i].quanti));//Stampa a video
         }
         else{
-                printf("%i) Variazione al %s: %i\n",ArrayVariazione[i].data, i,  ArrayVariazione[i].quanti);
-                fprintf(fd, "%i)Variazione_%s: %i\n",ArrayVariazione[i].data, i,  ArrayVariazione[i].quanti);
+                printf("%i) Variazione al %s: %i\n",ArrayVariazione[i].data, i,  ArrayVariazione[i].quanti);//scrive su file
+                fprintf(fd, "%i)Variazione_%s: %i\n",ArrayVariazione[i].data, i,  ArrayVariazione[i].quanti);//Stampa a video
         }
         fclose(fd);
         return 1;
 }
 
-
+//Calcola l-aggregato totale e lo restituisce
 int calcolaTotaleTIPO(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
         FILE *fd;
         char filename[MAX_FILE];
@@ -530,9 +519,9 @@ int calcolaTotaleTIPO(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
         dateToConvert.tm_hour = dateToConvert.tm_min = dateToConvert.tm_sec = 0;
 
         int appoggioData[2][3];
-        //Controllo sulla prima data
 
 
+	//converte i bound passati in modo che siano adatti
         if(strcmp(bound1, "*") != 0) {
                 sscanf(bound1, "%d:%d:%d", &appoggioData[0][2], &appoggioData[0][1], &appoggioData[0][0]);
                 sprintf(bound1_temp, "%i_%i_%i",appoggioData[0][2], appoggioData[0][1], appoggioData[0][0]);
@@ -596,7 +585,7 @@ int calcolaTotaleTIPO(int tipo, char bound1 [MAX_DATA], char bound2[MAX_DATA]){
 }
 
 
-
+//Scrive l-agrgegato su file e nel caso del totale lo stampa a video, chiama le funzioni qui sopra
 void scriviAggr(char*bound1, char*bound2, char aggr, int tipo, int modalita){
         FILE *fd;
         char filename[MAX_FILE+100];
@@ -636,6 +625,8 @@ void scriviAggr(char*bound1, char*bound2, char aggr, int tipo, int modalita){
 
 }
 
+
+//controlla che non possegga gia' l-aggregato cercando di aprire il file. in caso lo trovi lo stampa
 int controllaAggr(char*bound1, char*bound2, char aggr, int tipo){
         FILE *fd;
         char filename[MAX_FILE];
@@ -707,6 +698,8 @@ int entryPresente(char* entry){
         return 0;
 }
 
+
+//Invia le entries quando viene richiesto un flooding
 int inviaEntriesMancanti(int req_port, int tipo, char bound1[MAX_DATA], char bound2[MAX_DATA], char* header){
 
 
@@ -831,8 +824,6 @@ int inviaEntriesMancanti(int req_port, int tipo, char bound1[MAX_DATA], char bou
         }
 
         fclose(fd);
-        if(miDevoFermare)
-                return 1;
         printf("Non ho tutte le entries necessarie, inoltro\n");
         return 0; // Se arrivo qui il richiedente ha bisogno di altre Entries
 }
@@ -845,16 +836,14 @@ int inviaEntriesMancanti(int req_port, int tipo, char bound1[MAX_DATA], char bou
 //Valuta Chiusura File Odietrno
 
 
-void stampaRisultati(){
-        printf("QUI DEVO STAMPARE AGGREGATO\n");
-}
+
 void checkTime() {	//controlla se bisogna chiudere il file odierno
         struct tm* tmOraTemp;
         time_t tempoOraTemp;
 
         tempoOraTemp = time(NULL);
         tmOraTemp = gmtime(&tempoOraTemp);
-        if((tmOraTemp->tm_hour == 18 && tmOraTemp->tm_min == 0) || debug==1){
+        if((tmOraTemp->tm_hour == 18 && tmOraTemp->tm_min == 0) || debug==1){ //alle 18 mando le entry odierne al DS 
 		inviaEntryDS();
 		printf("Registro della data odierna chiuso\n");
         }
